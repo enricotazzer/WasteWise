@@ -1,0 +1,418 @@
+/* Alarm colours are measured, not chosen.
+ *
+ * --danger (scaduto) and --warn (entro 3 giorni) are the two most important signals in the
+ * app, and the urgency board leans on them harder than the old flat list did. Both pairs
+ * were run through the dataviz validator against these exact surfaces:
+ *
+ *              normal-vision ΔE      CVD ΔE (worst)
+ *   light        17.9  (floor 15)     11.6  (target 8)
+ *   dark         18.4                 13.0
+ *
+ * The previous steps (#a8641a light, #e0a35e dark) measured 12.2 / 9.8 normal-vision and
+ * 6.2 / 4.8 under deutan — below the floor, i.e. genuinely hard to tell from red. Only the
+ * text inside each pill was rescuing them.
+ *
+ * Colour still never carries meaning alone: every urgency band ships as column + heading +
+ * count + icon, per the status rule.
+ */
+:root {
+  --bg: #faf8f5;
+  --surface: #ffffff;
+  --border: #e5ded4;
+  --text: #23201c;
+  --muted: #7a7268;
+  --accent: #2f6f4e;
+  --accent-soft: #e8f1eb;
+  --danger: #b3261e;
+  --danger-soft: #fbeae9;
+  --warn: #b07a00;
+  --warn-soft: #fbf1dc;
+  /* De-emphasis: the calm bands carry no chroma at all. Green is deliberately absent from
+     the urgency scale — accent green and muted gray measure only ΔE 10.8 apart, so they
+     could never safely encode adjacent bands. */
+  --calm: var(--muted);
+  --calm-soft: #f4f1ec;
+  --radius: 12px;
+  --radius-sm: 9px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16150f;
+    --surface: #201e18;
+    --border: #34302a;
+    --text: #f0ece5;
+    --muted: #a09889;
+    --accent: #6fc296;
+    --accent-soft: #1d3529;
+    --danger: #ee8478;
+    --danger-soft: #3a201e;
+    --warn: #9e7400;
+    --warn-soft: #332813;
+    --calm: var(--muted);
+    --calm-soft: #262319;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Wide enough for the board on a laptop, still centred and readable. The phone flows
+   (scanning, logging) are unaffected — they just stop being capped at 560px on desktop. */
+.app {
+  max-width: min(1240px, 100%);
+  margin: 0 auto;
+  padding: 0 16px 96px;
+}
+
+/* Screens that stay narrow because they're one column of forms by nature. Reading a form
+   at 1240px is worse, not better. */
+.narrow {
+  max-width: 620px;
+}
+
+header.topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 20px 0 12px;
+}
+header.topbar h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+header.topbar .sub { color: var(--muted); font-size: 13px; }
+header.topbar button {
+  background: none; border: none; color: var(--muted);
+  font-size: 13px; cursor: pointer; padding: 4px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+/* --- KPI row --- */
+/* Stat tiles, not a chart: each is a single current value, which is exactly the case where
+   a bar chart would be the wrong form. Values use proportional figures — tabular-nums makes
+   a large standalone number look loose, and nothing here aligns vertically. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.stat .n { font-size: 30px; font-weight: 600; line-height: 1.05; letter-spacing: -0.02em; }
+.stat .l { font-size: 12px; color: var(--muted); line-height: 1.3; }
+.stat .l em { font-style: normal; opacity: 0.85; }
+/* A status dot repeats the state the value colour already shows, so the tile never relies
+   on hue alone. */
+.stat .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+.stat.alert .n { color: var(--danger); }
+.stat.alert .dot { background: var(--danger); }
+.stat.warn .n { color: var(--warn); }
+.stat.warn .dot { background: var(--warn); }
+.stat.good .n { color: var(--accent); }
+.stat.good .dot { background: var(--accent); }
+
+/* --- Tabs --- */
+nav.tabs { display: flex; gap: 6px; margin-bottom: 16px; }
+nav.tabs button {
+  flex: 1; padding: 10px; font-size: 14px; font-weight: 500;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  border-radius: var(--radius); cursor: pointer;
+}
+nav.tabs button[aria-selected='true'] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+
+/* --- Forms --- */
+label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+input, select, textarea {
+  width: 100%; padding: 11px 12px; font-size: 16px; font-family: inherit;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+.row { display: flex; gap: 10px; }
+.row > * { flex: 1; }
+.field { margin-bottom: 12px; }
+
+button.primary {
+  width: 100%; padding: 13px; font-size: 15px; font-weight: 600;
+  background: var(--accent); color: #fff; border: none; border-radius: 10px; cursor: pointer;
+}
+button.primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* --- Item list --- */
+.item { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 8px; }
+.item .body { flex: 1; min-width: 0; }
+.item .name { font-weight: 600; font-size: 15px; }
+.item .meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.item .actions { display: flex; gap: 6px; }
+/* Cards stay neutral even inside an urgent column. Tinting every card in a red column
+   would be a wall of saturated blocks — the column border, heading and count already say
+   which band you're in, and the per-item pill carries the exact day count. */
+
+.pill { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.pill.red { background: var(--danger-soft); color: var(--danger); }
+.pill.amber { background: var(--warn-soft); color: var(--warn); }
+/* Calm bands: the day count is still useful, it just shouldn't compete for attention. */
+.pill.neutral { background: var(--calm-soft); color: var(--muted); font-weight: 500; }
+
+.iconbtn {
+  min-width: 40px; height: 40px; font-size: 17px; line-height: 1;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  border-radius: 10px; cursor: pointer;
+}
+.iconbtn:hover { border-color: var(--accent); }
+.iconbtn.danger:hover { border-color: var(--danger); }
+
+.empty { text-align: center; color: var(--muted); padding: 40px 20px; font-size: 14px; line-height: 1.5; }
+.error { background: var(--danger-soft); color: var(--danger); padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-bottom: 12px; }
+.ok { background: var(--accent-soft); color: var(--accent); padding: 10px 12px; border-radius: 10px; font-size: 14px; margin-bottom: 12px; }
+.hint { font-size: 12px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+/* --- Login --- */
+.login { max-width: 360px; margin: 15vh auto; padding: 0 16px; }
+.login h1 { font-size: 24px; margin-bottom: 4px; }
+.login p { color: var(--muted); font-size: 14px; margin-top: 0; margin-bottom: 24px; }
+
+/* --- Bottom sheet --- */
+.backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 50; }
+.sheet { background: var(--surface); border-radius: 16px 16px 0 0; padding: 18px 18px 28px; width: 100%; max-width: 560px; }
+.sheet h3 { margin: 0 0 4px; font-size: 17px; }
+.sheet .reasons { display: grid; gap: 8px; margin-top: 14px; }
+.sheet .reasons button { padding: 13px; text-align: left; font-size: 15px; background: var(--bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.sheet .reasons button:hover { border-color: var(--accent); }
+
+/* --- Scanner --- */
+/* The video is the whole point of the screen, so it gets real estate rather than a
+   thumbnail: a barcode has to be comfortably framable one-handed. */
+.scanner { position: relative; background: #000; border-radius: var(--radius); overflow: hidden; margin-bottom: 12px; }
+.scanner video { display: block; width: 100%; max-height: 60vh; object-fit: cover; }
+.scanner-frame {
+  position: absolute; left: 10%; right: 10%; top: 50%; height: 26%;
+  transform: translateY(-50%);
+  border: 2px solid rgba(255,255,255,0.85); border-radius: 10px;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,0.28);
+}
+.scanner-bar {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 12px; background: linear-gradient(transparent, rgba(0,0,0,0.6));
+}
+.scanner-hint { color: #fff; font-size: 13px; }
+.scanner-engine { font-style: normal; opacity: 0.55; margin-left: 6px; font-size: 11px; }
+.scanner-bar button { padding: 8px 14px; border-radius: 999px; border: none; background: rgba(255,255,255,0.9); font-size: 14px; cursor: pointer; }
+.scanner-error { text-align: center; }
+.scanner-error p { font-size: 14px; line-height: 1.5; color: var(--muted); }
+
+button.primary.big { padding: 20px; font-size: 17px; }
+
+.scan-stats { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); font-size: 13px; color: var(--muted); }
+.scan-stats strong { color: var(--text); font-size: 15px; }
+
+.scan-sheet { border: 2px solid var(--accent); }
+.scan-sheet-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.scan-sheet-head h2 { margin: 0 0 2px; font-size: 17px; }
+.scan-sheet-actions { display: flex; gap: 10px; margin-top: 4px; }
+.scan-sheet-actions button { flex: 1; padding: 13px; font-size: 15px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); cursor: pointer; }
+.scan-sheet-actions button.primary { border: none; }
+
+/* Match method is shown so a wrong-looking result is traceable: `off` came from the
+   database, `llm` had its category guessed, `manual` you set yourself. */
+.pill.method-cache, .pill.method-off { background: var(--accent-soft); color: var(--accent); }
+.pill.method-llm { background: var(--warn-soft); color: var(--warn); }
+.pill.method-manual { background: var(--border); color: var(--muted); }
+.pill.method-unresolved { background: var(--danger-soft); color: var(--danger); }
+
+.session-list { list-style: none; margin: 0; padding: 0; }
+.session-list li { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+.session-list li:last-child { border-bottom: none; }
+
+/* --- Quick add (loose produce) --- */
+.recents { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  padding: 10px 14px; font-size: 14px; font-family: inherit;
+  background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+}
+.chip:hover { border-color: var(--accent); }
+.chip:disabled { opacity: 0.5; }
+.chip em { font-style: normal; font-size: 11px; color: var(--muted); }
+
+.muted { color: var(--muted); font-size: 13px; }
+.stats .stat .l em { font-style: normal; opacity: 0.8; }
+
+/* --- Kitchen board --- */
+/* Four urgency columns on a laptop, two on a tablet, stacked sections on a phone. The same
+   component and the same markup at every width — only the grid changes, so the phone
+   logging flow keeps working exactly as before. */
+.board {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+@media (min-width: 700px)  { .board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1100px) { .board { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+
+.column {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px;
+  min-width: 0;                 /* long product names must not blow out the grid track */
+}
+.column.is-empty { opacity: 0.55; }
+
+/* Sticky so the band you're looking at stays named while you scroll a long column. */
+.column-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 10px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 10px;
+}
+.column-head .icon { font-size: 14px; line-height: 1; }
+.column-head .title { font-size: 13px; font-weight: 600; letter-spacing: -0.01em; }
+.column-head .count {
+  margin-left: auto;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;   /* counts DO align vertically across columns */
+  color: var(--muted);
+  background: var(--calm-soft);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+/* Only the two urgent bands carry chroma. "Questa settimana" and "Più avanti" are neutral —
+   the emphasis form: highlight what needs a decision, recede everything else. */
+.column.critical { border-color: var(--danger); }
+.column.critical .column-head .title { color: var(--danger); }
+.column.critical .column-head .count { background: var(--danger-soft); color: var(--danger); }
+.column.serious { border-color: var(--warn); }
+.column.serious .column-head .title { color: var(--warn); }
+.column.serious .column-head .count { background: var(--warn-soft); color: var(--warn); }
+
+.column .item { margin-bottom: 8px; border-radius: var(--radius-sm); padding: 10px; }
+.column .item:last-child { margin-bottom: 0; }
+.column-empty { font-size: 12px; color: var(--muted); padding: 6px 4px 10px; }
+
+/* Non-perishables would otherwise drown the columns that need attention. */
+.undated summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 12px 4px;
+  list-style: none;
+}
+.undated summary::-webkit-details-marker { display: none; }
+.undated summary::before { content: '▸ '; }
+.undated[open] summary::before { content: '▾ '; }
+.undated .grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* --- Recipes: graph + list --- */
+.recipes-layout { display: grid; gap: 12px; grid-template-columns: 1fr; align-items: start; }
+@media (min-width: 1000px) { .recipes-layout { grid-template-columns: minmax(0, 1.1fr) minmax(320px, 0.9fr); } }
+.recipes-layout h2 { font-size: 15px; margin: 0 0 4px; }
+.recipes-side { display: grid; gap: 12px; align-content: start; }
+
+.graph-wrap { position: relative; margin-top: 10px; }
+.graph { width: 100%; height: auto; display: block; touch-action: manipulation; }
+
+/* Recessive hairlines — the edges are context, the nodes are the subject. */
+.edge { stroke: var(--border); }
+.edge.dim { stroke-opacity: 0.25; }
+
+.node { cursor: pointer; }
+.node .hit { fill: transparent; }         /* >=24px hit target around a 12-30px dot */
+.node .dot { stroke: var(--surface); stroke-width: 2; }   /* 2px surface ring, not a border */
+.node.calm .dot { fill: var(--muted); fill-opacity: 0.55; }
+.node.serious .dot { fill: var(--warn); }
+.node.critical .dot { fill: var(--danger); }
+.node.dim { opacity: 0.22; }
+.node:focus-visible { outline: none; }
+.node:focus-visible .dot { stroke: var(--accent); stroke-width: 3; }
+/* Labels wear text ink, never the series colour. */
+.node .label {
+  font-size: 10px; text-anchor: middle; fill: var(--text);
+  paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.graph-tip {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 10px; font-size: 12px; display: flex; flex-direction: column; gap: 1px;
+  pointer-events: none;
+}
+.graph-tip span { color: var(--muted); }
+
+.graph-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted); margin-top: 10px; align-items: center; }
+.graph-legend .swatch { width: 9px; height: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; vertical-align: 0; }
+.graph-legend .swatch.critical { background: var(--danger); }
+.graph-legend .swatch.serious { background: var(--warn); }
+.graph-legend .swatch.calm { background: var(--muted); opacity: 0.55; }
+
+.unlock { padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.unlock:last-child { border-bottom: none; padding-bottom: 0; }
+.unlock-head { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+
+.match-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.match { border-bottom: 1px solid var(--border); padding: 9px 0; }
+.match:last-child { border-bottom: none; padding-bottom: 0; }
+.match.is-selected { background: var(--accent-soft); border-radius: 10px; padding: 10px; margin: 4px -4px; }
+.match-head {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between; width: 100%;
+  background: none; border: none; padding: 0; cursor: pointer; text-align: left;
+  color: var(--text); font-family: inherit; font-size: 14px; font-weight: 600;
+}
+.match-meta { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; margin-top: 3px; }
+.match-meta .rescues { color: var(--accent); }
+.match-meta .missing { color: var(--muted); }
+.match-body { margin-top: 8px; font-size: 13px; line-height: 1.5; }
+.match-body p { margin: 6px 0; }
+
+.column-more {
+  width: 100%; margin-top: 6px; padding: 9px; font-size: 12px; font-family: inherit;
+  background: none; color: var(--muted); cursor: pointer;
+  border: 1px dashed var(--border); border-radius: var(--radius-sm);
+}
+.column-more:hover { border-color: var(--accent); color: var(--accent); }
+
+/* On a phone the KPI row is pure chrome above the items you came for. Keep the numbers
+   legible but stop them eating three rows before the first card. */
+@media (max-width: 560px) {
+  .stats { grid-template-columns: repeat(auto-fit, minmax(104px, 1fr)); gap: 8px; }
+  .stat { padding: 10px; }
+  .stat .n { font-size: 22px; }
+  .stat .l { font-size: 11px; }
+}

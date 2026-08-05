@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+# Explicit: flat layout with app/, tests/ and alembic/ side by side would otherwise
+# trip setuptools' multiple-top-level-packages auto-discovery error.
+packages = ["app"]
+
+[project]
+name = "wastewise-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "sqlalchemy>=2.0.36",
+    "psycopg[binary]>=3.2",
+    "alembic>=1.14",
+    "pydantic[email]>=2.10",  # [email] -> email-validator, required by EmailStr
+    "pydantic-settings>=2.6",
+    "python-jose[cryptography]>=3.3",
+    "passlib[bcrypt]>=1.7.4",
+    "bcrypt==4.0.1",
+    "python-multipart>=0.0.17",
+    "apscheduler>=3.10",
+    "pgvector>=0.3.6",
+    # Runtime, not just test: Open Food Facts and both LLM providers are plain HTTP calls,
+    # which is cheaper than three vendor SDKs for the surface actually used.
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "pytest-cov>=6.0",
+    "respx>=0.22",  # httpx mocking — no network in the test suite
+    "ruff>=0.8",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+# The seed files are data tables, reviewed by a human as tables. The formatter explodes
+# them one-field-per-line (recipes.py went from 277 to 900+ lines), which destroys the only
+# property that makes them reviewable. Excluded from the formatter; E501 waived below.
+extend-exclude = ["app/seeds/data.py", "app/seeds/recipes.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/seeds/data.py" = ["E501"]
+"app/seeds/recipes.py" = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]
