@@ -1,7 +1,7 @@
-.PHONY: help setup up down logs migrate revision seed seed-recipes demo demo-clear reset test lint web-install web dev-https certs scan-stats
+.PHONY: help setup up down logs migrate revision seed seed-recipes demo demo-clear reset test lint web-install web dev-https certs scan-stats savings-rebuild repurchase risk-score risk-fit crawl embed jobs eval eval-demo
 
 help:
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n",$$1,$$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'
 
 setup:  ## First-time setup: .env + build + migrate + seed
 	@test -f .env || (cp .env.example .env && echo "created .env — edit FIRST_USER_PASSWORD and SECRET_KEY")
@@ -81,3 +81,40 @@ scan-stats:  ## Module 1 scorecard: how many barcodes resolved without typing
 
 seed-recipes:  ## Load the starter Italian recipe corpus; reports its ingredient match rate
 	docker compose exec -T api python -m app.seeds.load_recipes
+
+# --- Jobs ------------------------------------------------------------------------------
+# Every job is idempotent, so re-running one is always safe. They are Makefile targets
+# rather than a lifespan-mounted scheduler because the test client fires app startup.
+
+savings-rebuild:  ## Rebuild the savings ledger from inventory + events; reports rows by kind
+	docker compose exec -T api python -m app.jobs.savings
+
+repurchase:  ## Close stale items whose product was bought again (flagged repurchase_inferred)
+	docker compose exec -T api python -m app.jobs.repurchase
+
+risk-score:  ## Recompute risk_scores for every active item using the live model
+	docker compose exec -T api python -m app.jobs.scoring
+
+risk-fit:  ## Fit the v1 Cox/GBM survival model; reports c-index vs. the v0 baseline
+	docker compose exec -T api python -m app.jobs.fit
+
+jobs:   ## Run the full nightly chain: repurchase -> savings-rebuild -> risk-score
+	$(MAKE) repurchase
+	$(MAKE) savings-rebuild
+	$(MAKE) risk-score
+
+# --- Recipe corpus ---------------------------------------------------------------------
+
+crawl:  ## Crawl Italian recipe sites into the local corpus (robots.txt, 1 req/2s per host)
+	docker compose exec -T api python -m app.jobs.crawl
+
+embed:  ## Embed recipes that have no vector yet (CPU, offline, resumable)
+	docker compose exec -T api python -m app.jobs.embed
+
+# --- Evaluation ------------------------------------------------------------------------
+
+eval:   ## Regenerate every number the README claims, from the database (real data only)
+	docker compose exec -T api python -m app.eval.report
+
+eval-demo:  ## Same, but including synthetic rows — for exercising the report, not reporting
+	docker compose exec -T api python -m app.eval.report --include-demo

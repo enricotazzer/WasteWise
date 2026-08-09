@@ -4,7 +4,7 @@ from sqlalchemy import text
 
 from app.config import settings
 from app.db import engine
-from app.routers import auth, catalog, inventory, recipes, scan
+from app.routers import auth, catalog, inventory, recipes, risk, scan, stats
 
 app = FastAPI(
     title="WasteWise API",
@@ -28,6 +28,8 @@ app.include_router(catalog.router)
 app.include_router(inventory.router)
 app.include_router(scan.router)
 app.include_router(recipes.router)
+app.include_router(stats.router)
+app.include_router(risk.router)
 
 
 @app.get("/api/health", tags=["meta"])

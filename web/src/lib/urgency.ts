@@ -1,4 +1,5 @@
 import type { InventoryItem } from '../api'
+import type { IconName } from '../ui/Icon'
 
 /**
  * The urgency bands the Kitchen board is built from.
@@ -14,7 +15,8 @@ export type BandKey = 'expired' | 'soon' | 'week' | 'later' | 'undated'
 export interface Band {
   key: BandKey
   title: string
-  icon: string
+  /** Shape is the band's second cue after position; the tone colour is only its third. */
+  icon: IconName
   /** Drives the column's border/heading treatment. Never the only cue. */
   tone: 'critical' | 'serious' | 'calm'
   empty: string
@@ -24,28 +26,28 @@ export const BANDS: Band[] = [
   {
     key: 'expired',
     title: 'Scaduti',
-    icon: '⚠',
+    icon: 'warning',
     tone: 'critical',
     empty: 'Niente scaduto.',
   },
   {
     key: 'soon',
     title: 'Entro 3 giorni',
-    icon: '◔',
+    icon: 'clock',
     tone: 'serious',
     empty: 'Niente in scadenza.',
   },
   {
     key: 'week',
     title: 'Questa settimana',
-    icon: '·',
+    icon: 'dot',
     tone: 'calm',
     empty: 'Niente questa settimana.',
   },
   {
     key: 'later',
     title: 'Più avanti',
-    icon: '·',
+    icon: 'dot',
     tone: 'calm',
     empty: 'Niente più avanti.',
   },

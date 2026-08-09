@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Two more observed shapes at once: a top-level ARRAY of unrelated nodes rather than a
+     single document, and `HowToSection`s that hold the actual steps one level down. Also a
+     `recipeYield` of "500" — grams, not servings. A 500-serving recipe would silently divide
+     every per-portion figure downstream by five hundred, so the parser must reject it. -->
+<html lang="it">
+<head>
+<script type="application/ld+json">
+[
+  {"@type": "BreadcrumbList", "itemListElement": []},
+  {
+    "@context": "https://schema.org",
+    "@type": "Recipe",
+    "name": "Torta di mele",
+    "recipeYield": "500",
+    "totalTime": "PT1H15M",
+    "recipeIngredient": [
+      "3 mele",
+      "200 g farina 00",
+      "150 g zucchero",
+      "2 uova",
+      "1 bustina di lievito per dolci"
+    ],
+    "recipeInstructions": [
+      {
+        "@type": "HowToSection",
+        "name": "Impasto",
+        "itemListElement": [
+          {"@type": "HowToStep", "text": "Sbatti le uova con lo zucchero."},
+          {"@type": "HowToStep", "text": "Unisci farina e lievito setacciati."}
+        ]
+      },
+      {
+        "@type": "HowToSection",
+        "name": "Cottura",
+        "itemListElement": [
+          {"@type": "HowToStep", "text": "Inforna a 180 gradi per 45 minuti."}
+        ]
+      }
+    ]
+  }
+]
+</script>
+</head>
+<body><h1>Torta di mele</h1></body>
+</html>

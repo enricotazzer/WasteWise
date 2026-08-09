@@ -70,3 +70,50 @@ class RiskBand(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
+
+
+class SavingsDomain(StrEnum):
+    """Which part of household spending an entry belongs to.
+
+    Food is the only domain that writes rows today. The other two are declared now, not
+    later, because they are what makes `savings_entries` a ledger rather than a second
+    inventory table: the aggregation queries group by domain, so a Bills module adds rows
+    and appears on the dashboard without a schema change or a second set of queries.
+    """
+
+    FOOD = "food"
+    UTILITIES = "utilities"
+    SUBSCRIPTIONS = "subscriptions"
+
+
+class EntryKind(StrEnum):
+    """What an entry says about the money.
+
+    SPEND is the whole; USED and WASTE are partitions of it. AVOIDED is a *counterfactual* —
+    money that would have been spent and wasn't — and the food domain deliberately never
+    writes one. See the R6 note in `services/savings/rules.py`.
+    """
+
+    SPEND = "spend"  # money left the household
+    USED = "used"  # part of a SPEND that produced its intended value
+    WASTE = "waste"  # part of a SPEND that bought nothing
+    AVOIDED = "avoided"  # counterfactual saving, measured against a baseline
+
+
+class EntryBasis(StrEnum):
+    """How much the number on the row is worth believing. Ordered here from strongest to
+    weakest; the reporting layer refuses to sum euros across two of them."""
+
+    MEASURED = "measured"  # a price the user actually typed
+    INFERRED_PRICE = "inferred_price"  # this item had no price; one was carried over
+    MODELLED = "modelled"  # produced by a model, not observed
+    UNPRICED = "unpriced"  # the outcome is known, the money is not — amount_eur is NULL
+
+
+class SourceKind(StrEnum):
+    """What produced an entry. Half of the ledger's identity key, and deliberately not a
+    foreign key: a domain that has no inventory items still needs stable row identity."""
+
+    INVENTORY_ITEM = "inventory_item"
+    CONSUMPTION_EVENT = "consumption_event"
+    SAVINGS_BASELINE = "savings_baseline"  # utilities: the counterfactual an AVOIDED cites

@@ -27,6 +27,10 @@ services:
     volumes:
       - ./api:/srv/api
       - ./data:/srv/data
+      # The eval notebook runs against this container, because that is where `app` and the
+      # database credentials already are. Mounted rather than copied so an executed notebook
+      # writes its outputs back to the repo.
+      - ./notebooks:/srv/notebooks
     depends_on:
       db:
         condition: service_healthy

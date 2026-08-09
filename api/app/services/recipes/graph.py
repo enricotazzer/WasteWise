@@ -24,8 +24,9 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import InventoryItem, Product, Recipe
+from app.models import InventoryItem, Product
 from app.models.enums import ItemStatus
+from app.services.recipes.retrieval import overlapping
 
 # Matches the UI's urgency bands. Kept here too so the API is usable without the frontend.
 AT_RISK_DAYS = 3
@@ -126,8 +127,10 @@ def build_graph(db: Session, user_id: int, *, include_staples: bool = False) -> 
     # Pair -> (weight, recipe ids). Keyed low-id-first so an edge is stored once.
     pairs: dict[tuple[int, int], GraphEdge] = {}
 
-    recipes = db.scalars(select(Recipe).where(Recipe.ingredient_product_ids.isnot(None)))
-    for recipe in recipes:
+    # Only recipes that mention something in the house can contribute a node count or an
+    # edge, so the array-overlap index answers this instead of a full table scan. Uncapped:
+    # `recipe_count` is an exhaustive count and a truncated pool would understate it.
+    for recipe in overlapping(db, sorted(in_house), limit=None):
         ids = recipe.ingredient_product_ids or []
         present = sorted(in_house.intersection(ids))
         for pid in present:

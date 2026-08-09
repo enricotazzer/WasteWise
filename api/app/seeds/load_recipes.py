@@ -26,6 +26,7 @@ from app.models import Product, ProductAlias, Recipe
 from app.models.enums import AliasSource
 from app.seeds.recipes import RECIPES
 from app.services.normalize import normalize_text
+from app.services.recipes.ingredients import resolve_product_id
 
 SOURCE_SITE = "seed"
 
@@ -96,19 +97,14 @@ def seed_synonyms(db: Session) -> int:
 
 
 def resolve_ingredient(db: Session, raw: str) -> int | None:
-    """Ingredient string -> product id, or None. Same two tiers as the barcode resolver."""
-    text = parse_ingredient(raw)
-    norm = normalize_text(text)
-    if not norm:
-        return None
+    """Ingredient string -> product id, or None.
 
-    alias = db.scalar(select(ProductAlias).where(ProductAlias.raw_text_norm == norm))
-    if alias is not None:
-        return alias.product_id
-
-    # Exact canonical name as a second chance — aliases strip pack sizes, names don't.
-    product = db.scalar(select(Product).where(Product.name_it.ilike(text.strip())))
-    return product.id if product else None
+    The matching itself lives in `services/recipes/ingredients.py` and is imported rather
+    than repeated, so this loader and the Phase 4 crawler measure the *same* matcher. Two
+    copies would make the two match rates incomparable, which is the only thing they are
+    for. Only the parsing in front of it differs — see that module for why.
+    """
+    return resolve_product_id(db, parse_ingredient(raw))
 
 
 def main() -> int:

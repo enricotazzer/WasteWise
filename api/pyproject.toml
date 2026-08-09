@@ -28,6 +28,26 @@ dependencies = [
     # Runtime, not just test: Open Food Facts and both LLM providers are plain HTTP calls,
     # which is cheaper than three vendor SDKs for the surface actually used.
     "httpx>=0.28",
+    # --- Risk model (phase 3) ---
+    # CPU-only, per the no-paid-inference / no-fine-tuning constraint. lifelines brings the
+    # Cox PH fit and the Kaplan-Meier cold-start fallback; sklearn is the GBM it's compared
+    # against. Both depend on pandas/numpy, which are pinned here because the feature frame
+    # and the eval notebook use them directly rather than only through those two.
+    "lifelines>=0.30",
+    "scikit-learn>=1.6",
+    "pandas>=2.2",
+    "numpy>=2.1",
+    # --- Recipes (phase 4) ---
+    # ONNX rather than sentence-transformers, which is what the brief names. Same model
+    # (all-MiniLM-L6-v2) and the same 384-dim output the `recipes.embedding` column is
+    # already sized for, but fastembed runs it on onnxruntime (~50 MB) where
+    # sentence-transformers would pull torch (~2 GB in this image) to do identical work.
+    # The brief's intent was "CPU embeddings, offline, no API cost"; this satisfies it and
+    # keeps `make setup` from becoming a multi-gigabyte download.
+    "fastembed>=0.5",
+    # JSON-LD extraction: recipe sites embed schema.org/Recipe in <script> tags, so the
+    # parser needs to find those tags, not to understand the surrounding HTML.
+    "selectolax>=0.3.21",
 ]
 
 [project.optional-dependencies]

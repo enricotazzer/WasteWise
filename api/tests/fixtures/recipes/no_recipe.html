@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- A category listing: real JSON-LD, no Recipe anywhere. The crawler will fetch pages like
+     this whenever a sitemap URL pattern is looser than it looked, and the parser must return
+     None rather than inventing a recipe out of an Article. -->
+<html lang="it">
+<head>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type": "CollectionPage", "name": "Primi piatti"},
+    {"@type": "Article", "headline": "I 10 primi piatti piu amati", "articleBody": "..."}
+  ]
+}
+</script>
+</head>
+<body><h1>Primi piatti</h1></body>
+</html>

@@ -8,15 +8,29 @@ This is a measurable economic and environmental problem, so WasteWise measures i
 wasted are computed from prices actually paid, and the "at risk of waste" detector is scored
 against realised outcomes rather than asserted.
 
-**Status: Phase 1.5 — board & recipe graph.** Scan the shopping with a phone camera, resolve
-products against Open Food Facts, log what gets eaten or binned on an urgency board, and see
-which recipes rescue what's about to go off. The risk model and the dashboard are not built
-yet. See [PLAN.md](PLAN.md) for the roadmap and the reasoning
-behind each choice.
+**Status: all five phases built.** Scan the shopping with a phone camera, resolve products
+against Open Food Facts, log what gets eaten or binned on an urgency board, see which recipes
+rescue what's about to go off, and read the whole thing back as a dashboard. 378 tests.
+See [PLAN.md](PLAN.md) for the roadmap and the reasoning behind each choice.
+
+**Every number below is regenerated from the database, not written down.** Run `make eval` or
+[`notebooks/eval.ipynb`](notebooks/eval.ipynb) — both call the same module the API does.
 
 **Everything external is free.** No paid inference anywhere: Open Food Facts is a free API,
 and the two LLM providers are free tiers with no credit card. The app works with no API keys
 configured at all.
+
+> ## What is measured, and what is not
+>
+> There is **no real logging in this database yet**, so the honest reported value of every
+> headline number is *unavailable*. `make demo` fills the app with eight weeks of plausible
+> synthetic outcomes so the screens can be judged, and every one of those rows carries
+> `is_demo=True` and is excluded from every reported figure by default.
+>
+> That is not a formality. The two things this project claims to measure — how well waste is
+> predicted, and how many euros it costs — are only meaningful over outcomes that actually
+> happened. A precision figure computed from a generator measures the generator. Where a
+> figure below comes from demo data it is labelled **demo**, in the UI as well as here.
 
 ---
 
@@ -48,12 +62,19 @@ Then open `https://<your-lan-ip>:5173` on the phone. Add that same origin to `CO
 in `.env`.
 
 ```bash
-make test          # 175 tests, in-container against a throwaway Postgres
-make scan-stats    # how many barcodes resolved without typing
-make seed-recipes  # load the starter recipe corpus; reports its match rate
-make demo          # fill the app with a synthetic 8-week household
-make demo-clear    # remove it again
-make reset         # DESTRUCTIVE: drop the volume and rebuild
+make test            # 378 tests, in-container against a throwaway Postgres
+make eval            # regenerate every number in this README from the database
+make demo            # fill the app with a synthetic 8-week household
+make demo-clear      # remove it again
+
+make seed-recipes    # 82 hand-written Italian recipes
+make crawl           # crawl more (robots.txt, 1 req/2s per host, resumable)
+make embed           # embed the corpus for pgvector reranking — CPU, offline
+
+make jobs            # the nightly chain: repurchase -> savings-rebuild -> risk-score
+make risk-fit        # fit v1; refuses below the data gate and says how far short
+make scan-stats      # how many barcodes resolved without typing
+make reset           # DESTRUCTIVE: drop the volume and rebuild
 ```
 
 ### About `make demo`
@@ -78,17 +99,23 @@ measurement Phase 1 exists to produce, and seeding it would make it worthless.
 
 Four modules, built in dependency order.
 
-| # | Module | Phase | State |
-|---|---|---|---|
-| 1 | **Data acquisition** — barcode → Open Food Facts → canonical product → inventory | 1 | ✅ built |
-| 2 | **Predictive model** — survival analysis for P(consumed before expiry) | 3 | not started |
-| 3 | **Recommendation** — fridge graph + coverage ranking over a recipe corpus | 4 | ✅ graph & ranking built; crawler + price flags pending |
-| 4 | **Dashboard** — kg/€ saved over time, spend by category, model performance | 5 | stat counters only |
+| # | Module | State |
+| --- | --- | --- |
+| 1 | **Data acquisition** — barcode → Open Food Facts → canonical product → inventory | ✅ built; never scanned for real yet |
+| 2 | **Predictive model** — survival analysis for P(consumed before expiry) | ✅ v0 live · v1 built but below its data gate |
+| 3 | **Recommendation** — crawled corpus, fridge graph, coverage ranking, Italian phrasing | ✅ built · 1,666 recipes |
+| 4 | **Dashboard** — €/kg over time, spend by category, save rate, model performance | ✅ built |
 
-**Stack.** FastAPI · PostgreSQL 16 + pgvector · SQLAlchemy 2 · Alembic · React + Vite + TS ·
-TanStack Query · Open Food Facts · Groq (Gemini failover) · lifelines/scikit-learn.
-Everything ML-side is CPU-friendly — there is no local GPU here, which is why the original
-brief's Donut/Qwen2-VL LoRA fine-tune and local Llama 3.2 were dropped.
+Plus a **cross-domain savings ledger**: WasteWise is the first module of a wider personal-savings
+system, so every euro-relevant fact lands in one `savings_entries` table keyed by `domain`. Food
+is the only writer today; utilities and subscriptions are enum values away, not a migration.
+
+**Stack.** FastAPI · PostgreSQL 16 + pgvector · SQLAlchemy 2 · Alembic · React 19 + Vite + TS ·
+TanStack Query · Recharts · Open Food Facts · Groq (Gemini failover) · lifelines/scikit-learn ·
+fastembed. Everything ML-side is CPU-friendly — there is no local GPU here, which is why the
+original brief's Donut/Qwen2-VL LoRA fine-tune and local Llama 3.2 were dropped. Embeddings run
+on onnxruntime rather than sentence-transformers for the same reason: identical
+all-MiniLM-L6-v2 vectors at 384 dims, ~50 MB in the image instead of torch's ~2 GB.
 
 ### How a scan resolves
 
@@ -96,7 +123,7 @@ Four tiers, cheapest first. The tier that served each scan is recorded, which is
 module's quality number comes from.
 
 | Tier | Source | Cost |
-|---|---|---|
+| --- | --- | --- |
 | 1 | `product_barcodes` cache hit | instant, offline |
 | 2 | Open Food Facts + a rules table over its category taxonomy | one HTTP call, then cached forever |
 | 3 | Open Food Facts + an LLM for categories the rules miss | one free-tier call |
@@ -191,20 +218,28 @@ distinction this project measures.
 
 ## What's actually built
 
-```
+```text
 api/app/
-├─ models/          12 tables covering all 5 phases (schema stable; features are not)
-├─ routers/         auth · catalog · inventory · scan
+├─ models/          13 tables (schema stable; savings_entries is the cross-domain ledger)
+├─ routers/         auth · catalog · inventory · scan · recipes · stats · risk
 ├─ services/
 │  ├─ barcode/      off_client.py · category_map.py · resolver.py
 │  ├─ llm/          groq.py · gemini.py · router.py (failover)
-│  ├─ recipes/      graph.py · rank.py · unlock.py
+│  ├─ risk/         features.py · baseline.py (v0) · survival.py (v1) · scoring.py
+│  ├─ savings/      rules.py · writer.py · aggregate.py · anomaly.py
+│  ├─ recipes/      jsonld.py · crawler.py · frontier.py · sites.py · ingredients.py
+│  │                embed.py · retrieval.py · generate.py · graph.py · rank.py · unlock.py
 │  └─ shelf_life.py · normalize.py
+├─ jobs/            savings · repurchase · scoring · fit · crawl · embed  (all idempotent)
+├─ eval/            report.py — every README number, one source of truth
 ├─ seeds/           31 categories, 56 products, 82 recipes, demo.py generator
-└─ tests/           175 tests, no network
+└─ tests/           378 tests, no network anywhere (respx + saved HTML fixtures)
 web/src/
-├─ lib/             barcode.ts (BarcodeDetector + wasm) · urgency.ts · forceLayout.ts
-└─ components/      Login · StatsBar · Kitchen · Recipes · FridgeGraph · Scanner · AddItem
+├─ ui/              tokens.css · Card Tile Button Badge Money Skeleton EmptyState Segmented
+│                   DateRange Icon · charts/ (ChartFrame TimeSeries StackedBars Sparkline)
+├─ shell/           AppShell (sidebar ≥1000px, bottom tab bar below) · routes.tsx registry
+├─ domains/food/    Kitchen · Recipes · ScanScreen · AddItem · Dashboard · FridgeGraph
+└─ lib/             barcode.ts (BarcodeDetector + wasm) · urgency.ts · forceLayout.ts
 ```
 
 The **Kitchen** screen is still the one that matters: items sorted by urgency, one tap to
@@ -212,26 +247,88 @@ record consumed / half / wasted, waste asking a single follow-up ("why?"). Its d
 is under 10 seconds a day, because every downstream module depends on that logging actually
 happening.
 
+The shell is **domain-agnostic on purpose.** `ui/` knows nothing about food, and a domain
+contributes `{id, label, icon, routes[]}` to a registry. Adding a bills module means appending
+one entry, not editing the navigation.
+
 ---
 
-## Validation approach
+## Results
 
-Three numbers, and the honest caveats on all of them.
+Regenerate all of it with `make eval`. Nothing here is typed by hand.
 
-**Acquisition** — the share of scans that resolved with zero typing, split by tier. Read it
-with `make scan-stats` or `GET /api/scan/stats`. It's computed from
-`product_barcodes.match_method`, so it's reproducible rather than remembered.
+### Recipe corpus — the one module with real, non-synthetic numbers
 
-**Detection quality** — weekly precision/recall of the at-risk flag against realised waste,
-with the v0 days-to-expiry heuristic as the baseline the learned model has to beat. The
-learned model does not start until there are ≥150 resolved items and ≥40 waste events; below
-that, a Cox fit would be noise.
+The crawler obeys `robots.txt`, waits 2s per host, identifies itself, and resumes from a
+persisted frontier. **1,666 recipes, all embedded** (384-dim, 21s on CPU).
 
-**Euros saved** — a baseline period (logging only) versus an intervention period (full
-system), reported with its price coverage. The original brief called this an A/B comparison.
-It is not: one household cannot run both arms concurrently, so it is confounded by season,
-learning effects, and the observer effect of logging itself. It will be reported as
-indicative, with those confounds named.
+| Source | Recipes | Ingredients matched to the catalog |
+| --- | ---: | ---: |
+| misya.info | 626 | 50.4% |
+| fattoincasadabenedetta.it | 603 | 49.4% |
+| ricettedellanonna.net | 355 | 55.1% |
+| hand-written seed corpus | 82 | 100.0% |
+| **total** | **1,666** | **52.2%** |
+
+**52% is the finding, not a failure.** The seed corpus scores 100% because it was written
+against this catalog — averaging it in would flatter the crawler with its own test set. Real
+ingredient strings are messy, and each of the 1,784 distinct unmatched strings is a missing
+`ProductAlias`: a one-line fix, ranked by frequency in the notebook.
+
+**Two large Italian recipe sites were deliberately skipped.** GialloZafferano and Cookaround
+both publish clean JSON-LD and both list `ClaudeBot` / `GPTBot` / `anthropic-ai` in
+`robots.txt`. A literal reading lets `WasteWiseBot` through, since it is on nobody's block
+list. We are not taking the literal reading: this corpus is retrieved over and handed to an
+LLM to phrase, which is exactly the use that list is drawn around. The full audit — including
+the sites rejected because their `robots.txt` was unreadable — is in
+[`sites.py`](api/app/services/recipes/sites.py).
+
+### Waste-risk detection — v1 did not beat v0
+
+The gate for fitting v1 is **≥150 resolved items and ≥40 waste events**. Against real data it
+stands at **0/150 and 0/40**, so `make risk-fit` refuses to fit and says how far short it is.
+Forced onto demo data (`--force`, which stamps `-ungated` on every figure it produces):
+
+| model | c-index | precision | recall | F1 |
+| --- | ---: | ---: | ---: | ---: |
+| v0 heuristic | **0.639** | 0.375 | 0.333 | 0.353 |
+| v1 Cox PH | 0.605 | 0.333 | 0.444 | 0.381 |
+| v1 GBM | 0.304 | 1.000 | 0.111 | 0.200 |
+
+Over 29 resolved test items, 9 of them wasted. **The Cox model ranks worse than the heuristic
+it was meant to improve on**, and that is enforced rather than merely reported: the scorer
+refuses to load a persisted model that lost, so v0 stays live. A more complex model that buys
+nothing is a result worth publishing.
+
+The split is **by acquisition date, never at random** — a random split puts later purchases in
+the training set and leaks future consumption into the past. Scoring is as-at-purchase, which
+is harder than the deployed operating point but is the only leakage-free version of the
+question.
+
+### Euros — measured, never estimated
+
+Prices are optional and typed by hand, so **every euro figure carries its price coverage** and
+kg figures carry a separate mass coverage (mass is only known for items bought by weight).
+A total computed over an unknown share of the data is not a measurement.
+
+The dashboard shows the count-based save rate beside **`unaccounted`** — spend that never
+became either consumption or waste. That pairing is deliberate: the save rate is computed over
+*resolved* items only, and food that was never logged is overwhelmingly food that was
+forgotten, so a high rate next to a large unaccounted figure is an unmeasured result rather
+than a good one.
+
+**The before/after comparison is not an A/B test**, whatever the brief called it. One household
+cannot run both arms concurrently, so it is sequential and confounded by season, by learning
+effects, and by the observer effect of logging itself — that last one is not a nuisance to
+control for but plausibly a large part of any effect, and it is inseparable from the
+intervention by construction. It will be reported as indicative with those confounds named,
+and it needs at least two weeks of baseline before it says anything at all.
+
+### Acquisition
+
+Zero-typing rate, split by tier, from `product_barcodes.match_method` — reproducible rather
+than remembered. **No barcode has been scanned yet, so there is no rate.** That is missing
+data, not a rate of 0%, and the report says so in those words.
 
 ---
 

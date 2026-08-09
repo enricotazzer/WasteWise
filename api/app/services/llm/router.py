@@ -25,6 +25,11 @@ class FailoverLLM:
     def __init__(self, providers: list[LLMProvider] | None = None) -> None:
         self._providers = providers if providers is not None else [GroqProvider(), GeminiProvider()]
         self.last_provider: str | None = None
+        # Token counts reported by whoever served the last call, when they report any.
+        # `getattr` on read: a provider is a Protocol, and usage is an optional courtesy —
+        # a stub in a test is a valid provider without it.
+        self.last_usage: dict[str, int] | None = None
+        self.last_model: str | None = None
 
     def is_configured(self) -> bool:
         return any(p.is_configured() for p in self._providers)
@@ -61,6 +66,8 @@ class FailoverLLM:
                 errors.append(f"{provider.name}: {exc}")
                 continue
             self.last_provider = provider.name
+            self.last_usage = getattr(provider, "last_usage", None)
+            self.last_model = getattr(provider, "model", None)
             return result
 
         raise LLMUnavailable("all providers failed -> " + "; ".join(errors))

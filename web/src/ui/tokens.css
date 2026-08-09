@@ -1,0 +1,121 @@
+/* Design tokens: everything except colour.
+ *
+ * The colour tokens deliberately stay in index.css, next to the ΔE measurement note that
+ * justifies them — moving them here would separate the values from the evidence.
+ *
+ * These scales exist because WasteWise is becoming one module of a larger savings
+ * framework. A second domain (bills) has to inherit the same rhythm without re-deriving it,
+ * and a dashboard built by another hand has to land on the same grid as the kitchen board.
+ * Hardcoded pixels can't carry that.
+ */
+:root {
+  /* --- Space ---------------------------------------------------------------
+     4px base with 2px and 6px half-steps. The half-steps are not decoration:
+     pill padding and the gap inside a stat tile are genuinely sub-8px, and
+     rounding them up to 8 visibly loosens dense rows. */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* --- Type ----------------------------------------------------------------
+     Ten steps looks like a lot; it's the deduplicated inventory of what the app
+     actually renders, not an invented ratio. This is a dense data UI — the gap
+     between a 12px meta line and a 13px label is doing real work, and a tidier
+     1.25 ratio would have forced every one of them to move. */
+  --text-2xs: 10px;   /* SVG node labels only, where the graph is already crowded */
+  --text-xs: 11px;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-base: 14px;
+  --text-lg: 15px;
+  --text-xl: 17px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 30px;
+  /* The hero figure, and nothing else. One per view, in the same sans as the rest — a
+     display face on the number a dashboard leads with reads as decoration, not as data.
+     Steps down to --text-4xl below 560px, where 56px would take two lines. */
+  --text-hero: 56px;
+  /* Form controls never go below this: iOS Safari zooms the viewport on focus for
+     anything under 16px, which throws the user out of a one-handed flow. */
+  --text-control: 16px;
+
+  --leading-flat: 1.05;   /* big standalone numbers */
+  --leading-tight: 1.3;
+  --leading-normal: 1.5;
+
+  --weight-medium: 500;
+  --weight-semibold: 600;
+
+  --tracking-tight: -0.01em;
+  --tracking-tighter: -0.02em;
+
+  /* --- Radius --- */
+  --radius-sm: 10px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* --- Elevation -----------------------------------------------------------
+     Two steps, both barely there. The app is built from hairline borders; shadow
+     is reserved for the two surfaces that genuinely float over content (the waste
+     sheet and the bottom bar), where a border alone reads as a seam. */
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.05), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 -2px 12px rgb(0 0 0 / 0.08);
+  --shadow-lg: 0 -6px 32px rgb(0 0 0 / 0.16);
+
+  /* --- Motion --- */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+
+  /* --- Layers --------------------------------------------------------------
+     Four named steps. Anything that needs a fifth is a layout bug. */
+  --z-raised: 1;      /* sticky column headings inside a scrolling column */
+  --z-nav: 40;        /* bottom tab bar, side nav */
+  --z-overlay: 50;    /* backdrop + bottom sheet */
+
+  /* --- Sizing --- */
+  --tap-min: 44px;         /* iOS HIG / WCAG 2.5.5 minimum on a coarse pointer */
+  --sidebar-w: 240px;
+  --bottombar-h: 60px;
+  --content-max: 1240px;
+  --content-narrow: 620px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* On a dark surface a black shadow is invisible; the lift has to come from
+       opacity against a near-black background instead of from a grey blur. */
+    --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+    --shadow-md: 0 -2px 12px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 -6px 32px rgb(0 0 0 / 0.6);
+  }
+}
+
+/* Neutralising the duration tokens covers every transition written against the scale;
+   the blanket rule catches third-party and inline animation we don't control. */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -45,6 +45,7 @@ class GeminiProvider:
         # See GroqProvider: `api_key=None` means "no key", not "read settings".
         self._api_key = settings.gemini_api_key if api_key is USE_SETTINGS else api_key
         self.model = model or settings.gemini_model
+        self.last_usage: dict[str, int] | None = None
 
     def is_configured(self) -> bool:
         return bool(self._api_key)
@@ -90,7 +91,19 @@ class GeminiProvider:
             raise LLMUnavailable(f"gemini {resp.status_code}: {resp.text[:200]}")
 
         try:
-            parts = resp.json()["candidates"][0]["content"]["parts"]
-            return json.loads("".join(p.get("text", "") for p in parts))
+            body = resp.json()
+            parts = body["candidates"][0]["content"]["parts"]
+            parsed = json.loads("".join(p.get("text", "") for p in parts))
         except (KeyError, IndexError, ValueError, TypeError) as exc:
             raise LLMUnavailable(f"gemini returned unparseable content: {exc}") from exc
+
+        usage = body.get("usageMetadata") or {}
+        self.last_usage = (
+            {
+                "input_tokens": int(usage.get("promptTokenCount") or 0),
+                "output_tokens": int(usage.get("candidatesTokenCount") or 0),
+            }
+            if usage
+            else None
+        )
+        return parsed

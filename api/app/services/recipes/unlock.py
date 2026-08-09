@@ -17,8 +17,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Product, Recipe
+from app.models import Product
 from app.services.recipes.graph import active_products
+from app.services.recipes.retrieval import overlapping
 
 
 @dataclass
@@ -46,7 +47,9 @@ def best_unlocks(db: Session, user_id: int, *, limit: int = 3) -> list[UnlockSug
     # candidate product -> (recipes it would complete, at-risk items those rescue)
     tally: dict[int, tuple[list[str], set[str]]] = {}
 
-    for recipe in db.scalars(select(Recipe).where(Recipe.ingredient_product_ids.isnot(None))):
+    # A recipe that rescues nothing at risk is discarded below anyway, so the pool is the
+    # recipes touching the at-risk items — an index probe rather than a corpus scan.
+    for recipe in overlapping(db, sorted(at_risk), limit=None):
         ids = recipe.ingredient_product_ids or []
         if not ids:
             continue

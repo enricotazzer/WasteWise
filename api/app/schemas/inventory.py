@@ -106,8 +106,13 @@ class RecentProduct(BaseModel):
 
 
 class InventoryStats(BaseModel):
-    """Baseline counters. The real dashboard lands in Phase 5, but these numbers tell you
-    immediately whether logging is actually happening."""
+    """Baseline counters. Superseded by `schemas/stats.StatsOverview`, which attaches a
+    coverage figure to each euro total instead of one shared caveat at the bottom.
+
+    Retained unchanged apart from `demo_included` because the frontend still reads it. The
+    euro fields cannot express "no price was typed" — they collapse it to 0.00 — which is the
+    exact flattening `MoneyFigure` exists to prevent.
+    """
 
     active_items: int
     expiring_within_3d: int
@@ -118,7 +123,10 @@ class InventoryStats(BaseModel):
     eur_wasted: Decimal
     eur_consumed: Decimal
     save_rate: float | None  # consumed / (consumed + wasted); None until data exists
-    # Share of resolved food items that carried a price. Every euro figure above is computed
-    # over this fraction only — reporting the total without it would overstate completeness,
-    # since prices are optional and typed by hand.
+    # Share of resolved food outcomes that carried a price. Every euro figure above is
+    # computed over this fraction only — reporting the total without it would overstate
+    # completeness, since prices are optional and typed by hand.
     price_coverage: float | None
+    # Whether synthetic rows were counted. Defaults to False at the endpoint, which is the
+    # fix for these numbers previously being computed over demo data with no indication.
+    demo_included: bool = False

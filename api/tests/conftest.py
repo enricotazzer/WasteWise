@@ -159,6 +159,17 @@ def seeded(db: Session) -> dict:
     }
 
 
+@pytest.fixture(autouse=True)
+def risk_model_dir(tmp_path, monkeypatch):
+    """Point the fitted-model store at a throwaway directory, for every test.
+
+    Autouse rather than opt-in: the default is `/srv/data/risk`, which is a mounted volume
+    the running app reads from. One test that fitted a model on four fixture rows would leave
+    it there, and `make risk-score` in another terminal would start serving it.
+    """
+    monkeypatch.setenv("RISK_MODEL_DIR", str(tmp_path / "risk"))
+
+
 @pytest.fixture
 def no_llm(monkeypatch):
     """Force the LLM tail to be unavailable.

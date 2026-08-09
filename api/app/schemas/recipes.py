@@ -53,3 +53,28 @@ class UnlockOut(BaseModel):
     unlocks: int
     rescues: list[str]
     recipe_titles: list[str]
+
+
+class PhrasedSuggestionOut(BaseModel):
+    """An LLM-phrased suggestion, or the deterministic sentence that replaces it.
+
+    `generated` is the field a caller must read before presenting this as written prose:
+    False means both free tiers were unavailable (or the output was rejected) and `text_it`
+    is the template. `fallback_reason` says which. The response is otherwise identical in
+    shape, so the screen degrades without a branch — and `matches` carries the full ranked
+    list either way, so nothing is lost when the model is.
+    """
+
+    text_it: str
+    generated: bool
+    title: str | None
+    recipe_id: int | None
+    source_url: str | None
+    uses: list[str]
+    missing: list[str]
+    rescues: list[str]
+    model_id: str | None
+    fallback_reason: str | None
+    #: Row id in `recipe_suggestions`. The handle for the accept/reject feedback signal.
+    suggestion_id: int | None
+    matches: list[RecipeMatchOut]

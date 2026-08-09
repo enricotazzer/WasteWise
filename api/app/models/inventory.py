@@ -19,6 +19,13 @@ from app.models.base import Base, TimestampMixin
 from app.models.catalog import Product
 from app.models.enums import EventSource, EventType, ExpirySource, ItemStatus, Unit
 
+# Below this much of an item left, it counts as used up rather than leaving a 0.02 sliver in
+# the kitchen forever. Lives next to the `fraction_remaining` column it governs because two
+# unrelated places need the same number and must never disagree: `log_event` resolves an item
+# on it *without writing an event*, and the savings ledger's fraction walk has to fold that
+# same unrecorded sliver into the last entry or it shows as unaccounted spend forever.
+RESOLVE_EPSILON = 0.01
+
 
 class InventoryItem(Base, TimestampMixin):
     """THE unit of observation for the survival model.

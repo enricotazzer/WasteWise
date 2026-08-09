@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Query
 
 from app.deps import CurrentUser, DbSession
-from app.schemas.recipes import FridgeGraphOut, RecipeMatchOut, UnlockOut
-from app.services.recipes import best_unlocks, build_graph, rank_recipes
+from app.schemas.recipes import (
+    FridgeGraphOut,
+    PhrasedSuggestionOut,
+    RecipeMatchOut,
+    UnlockOut,
+)
+from app.services.recipes import best_unlocks, build_graph, phrase_suggestion, rank_recipes
 
 router = APIRouter(prefix="/api/recipes", tags=["recipes"])
 
@@ -44,6 +49,40 @@ def suggestions(
 ) -> list[RecipeMatchOut]:
     """Recipes ranked by how much at-risk food they rescue, minus what you'd have to buy."""
     return [RecipeMatchOut(**m.__dict__) for m in rank_recipes(db, user.id, limit=limit)]
+
+
+@router.get("/suggestions/phrased", response_model=PhrasedSuggestionOut)
+def phrased_suggestion(
+    db: DbSession,
+    user: CurrentUser,
+    limit: int = Query(default=4, le=8, description="how many ranked recipes ground the call"),
+) -> PhrasedSuggestionOut:
+    """The same ranking, written out in Italian by a model.
+
+    Strictly additive: `/suggestions` above is unchanged and needs no API key, and this
+    endpoint returns 200 with `generated: false` when no provider is configured or both free
+    tiers are exhausted. There is no configuration in which this returns an error because a
+    model was unavailable — that is a routine state, not a failure.
+
+    The model chooses among the retrieved recipes and names only ingredients that are in the
+    kitchen; both are enforced by the response schema and re-checked afterwards. See
+    `services/recipes/generate.py`.
+    """
+    suggestion = phrase_suggestion(db, user.id, limit=limit)
+    return PhrasedSuggestionOut(
+        text_it=suggestion.text_it,
+        generated=suggestion.generated,
+        title=suggestion.title,
+        recipe_id=suggestion.recipe_id,
+        source_url=suggestion.source_url,
+        uses=suggestion.uses,
+        missing=suggestion.missing,
+        rescues=suggestion.rescues,
+        model_id=suggestion.model_id,
+        fallback_reason=suggestion.fallback_reason,
+        suggestion_id=suggestion.suggestion_id,
+        matches=[RecipeMatchOut(**m.__dict__) for m in suggestion.matches],
+    )
 
 
 @router.get("/unlock", response_model=list[UnlockOut])

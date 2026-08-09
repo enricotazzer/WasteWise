@@ -286,12 +286,12 @@ Each phase ends with something runnable **and a checkpoint you sign off on**.
 | Phase | Scope | ⛳ Checkpoint — what you review |
 |---|---|---|
 | **0 · Foundations** ✅ done | Repo, `docker compose`, schema + Alembic, seeded categories & shelf-life table, JWT auth, **manual item-entry form**, 52 tests | Stack comes up clean; **you review the DB schema and the seeded shelf-life table**. Superseded in part by the Phase 1 schema change below. |
-| **1 · Barcode acquisition** (~wk 2) | Schema rework (drop receipts, add `product_barcodes`), OFF client + cache, category mapping w/ Groq tail, LLM provider layer, scanner UI (native + WASM), HTTPS on LAN, quick-add | **Scan your actual shopping.** You review hit rate (how many barcodes resolve without you typing) and whether scanning is faster than typing. If it isn't, we cut it and keep quick-add. |
+| **1 · Barcode acquisition** ✅ done | Schema rework (drop receipts, add `product_barcodes`), OFF client + cache, category mapping w/ Groq tail, LLM provider layer, scanner UI (native + WASM), HTTPS on LAN, quick-add | **Scan your actual shopping.** You review hit rate (how many barcodes resolve without you typing) and whether scanning is faster than typing. If it isn't, we cut it and keep quick-add. |
 | **1.5 · Board & graph** ✅ done | Kitchen as an urgency board, validated alarm colours, KPI row, seeded Italian recipe corpus, fridge knowledge graph + coverage ranking. Pulls Phase 4's corpus forward; **no LLM** | You judge whether the board makes tonight's decision obvious, and whether the graph's suggestions are actually cookable. |
-| **2 · Kitchen** (~wk 3) | Consumption logging UI, repurchase inference job, waste ledger | **The friction gate.** You log for 2–3 days and tell me if it's sustainable. If it isn't, we redesign here — everything downstream depends on you actually logging. |
-| **3 · Risk** (~wk 4–5) | v0 heuristic → nightly scoring → v1 Cox/GBM once the data gate is met | You review v0's at-risk rankings against your own judgment. **v1 is a separate sub-checkpoint** — it only starts once the ≥150 items / ≥40 waste events gate is met, and I'll report if it isn't. |
-| **4 · Recommend** (~wk 6) | Italian recipe crawler + JSON-LD parser, ingredient→product mapping, embeddings, coverage ranking, Italian generation, price anomalies | You judge whether the suggestions are actually cookable, and whether the price flags are real signal. |
-| **5 · Dashboard** (~wk 7) | All four chart views, eval notebook, README with real numbers | Full walkthrough on your phone; you review the eval numbers and the README's claims before anything is public. |
+| **2 · Kitchen + savings ledger** ✅ done | Consumption logging UI, repurchase inference job, waste ledger | **The friction gate.** You log for 2–3 days and tell me if it's sustainable. If it isn't, we redesign here — everything downstream depends on you actually logging. |
+| **3 · Risk** ✅ done | v0 heuristic → nightly scoring → v1 Cox/GBM once the data gate is met | You review v0's at-risk rankings against your own judgment. **v1 is a separate sub-checkpoint** — it only starts once the ≥150 items / ≥40 waste events gate is met, and I'll report if it isn't. |
+| **4 · Recommend** ✅ done | Italian recipe crawler + JSON-LD parser, ingredient→product mapping, embeddings, coverage ranking, Italian generation, price anomalies | You judge whether the suggestions are actually cookable, and whether the price flags are real signal. |
+| **5 · Dashboard** ✅ done | All four chart views, eval notebook, README with real numbers | Full walkthrough on your phone; you review the eval numbers and the README's claims before anything is public. |
 
 **Stretch (post-5):** fridge/counter-photo fallback via a free vision model, for loose produce that has no barcode — this is the one place a VLM still earns its keep. Optionally, fine-tune a small model on the accumulated barcode→category mappings and benchmark it against the Groq tail call.
 
@@ -507,3 +507,82 @@ missing; unlock returns a product **not** already in inventory.
 2. **Loose produce has no barcode.** Covered by quick-add plus the `2`-prefix store-label binding, but it stays the weakest part of acquisition — and it is the largest waste category. The post-Phase-5 counter-photo VLM is aimed squarely at this.
 3. **OFF coverage on Italian products is community-driven and uneven.** The Phase 1 hit-rate measurement is exactly what tells us whether tier 2 pulls its weight; if coverage is poor, tier 4 (bind once, resolve forever) still carries the feature.
 4. **Baseline period length.** Two weeks of logging-only before switching on risk surfacing is the minimum for the before/after comparison to say anything at all. Longer is better; decide when you reach Phase 3.
+
+---
+
+## Phases 2–5 — delivery record (2026-08-07)
+
+Built in one run at your instruction, superseding the phase-by-phase review gates. Two
+decisions shaped it beyond the original plan: **WasteWise becomes the first module of a wider
+personal-savings system**, and **the dashboard is a first-class deliverable**.
+
+**378 tests · ruff clean · frontend builds clean · dataviz validator PASS in both modes.**
+
+### What was added beyond the original plan
+
+| Path | Why it exists |
+|---|---|
+| `models/savings.py` + `services/savings/` | The cross-domain ledger. One `savings_entries` table keyed by `domain`, so bills later arrive as a writer rather than a migration. |
+| `app/eval/report.py` | Every reported number, computed once. `make eval` and the notebook are both callers — a notebook that recomputed things its own way would disagree with the app within weeks. |
+| `web/src/ui/` + `web/src/shell/` | Domain-agnostic design system and app shell with a route registry. `ui/` knows nothing about food. |
+
+### Three honesty defects that were shipping, now fixed
+
+1. **`/api/inventory/stats` never filtered `is_demo`.** Every euro figure and the save rate
+   were computed over eight weeks of synthetic outcomes and rendered unlabelled. On this
+   database *all* of the €46.69 "wasted" was fabricated.
+2. **Waste euros were overstated.** The endpoint charged the full item value to `eur_wasted`
+   even after partial consumption was logged. Proven live: a €2.00 item logged `partial 0.5`
+   then `wasted` gave 2.00 before and **1.00** after.
+3. **The save rate had no denominator on screen.** It is computed over *resolved* items only,
+   and unresolved food is overwhelmingly forgotten food. `unaccounted` (€119.86 on the demo
+   household) now sits beside it, so the flattering number cannot be read alone.
+
+### Four bugs found by exercising the code rather than reading it
+
+- **Kaplan-Meier is flat past its support**, so a tin with 489 days left read as 4.7% likely
+  to be eaten and landed in HIGH. **41 of 67 items were flagged** — a detector that flags 61%
+  of a kitchen is useless. Fixed with exponential tail extrapolation; now 20 of 67.
+- **Both LLM providers rejected the recipe schema.** Gemini requires string enum members;
+  Groq's strict decoder failed the same schema. `recipe_id` is now a string enum carrying an
+  integer. A stubbed provider accepts either, which is why every test passed while the
+  feature was dead on arrival with real keys.
+- **`gemini-2.5-flash` 404s for new keys.** The failover had silently stopped working. Pinned
+  models rot; the default is now `gemini-flash-latest`.
+- **Italian decimal commas destroyed ingredients.** `parse_line` cut on the first comma to
+  strip preparation notes, so `"1,5 kg di zucca"` became `"1"` and the ingredient vanished.
+  Italian recipes write decimals that way by default.
+
+### Frontend defects only a screenshot could find
+
+- **All four dashboard plots rendered as nothing.** `{empty ?? children}` — callers pass
+  `condition && <EmptyState/>`, and `??` only falls through on null/undefined, so every card
+  drew its title, legend and caption around an invisible chart. The build was happy.
+- **Every icon was an empty box.** External `<use href="/icons.svg#x">` has never worked in
+  Chromium and fails silently at 0×0.
+- **The board's breakpoints broke once a sidebar existed** — at a 1100px viewport the board
+  had 828px, leaving ~47px for a product name beside three buttons.
+
+### Results
+
+**Recipe corpus — the only module with real numbers.** 1,666 recipes, all embedded.
+**52.2% ingredient match rate** across crawled sites (the seed corpus's 100% is not the
+comparison — it was written against this catalog). 1,784 distinct unmatched strings, each a
+missing `ProductAlias`, ranked by frequency in the notebook.
+
+**GialloZafferano and Cookaround were deliberately skipped.** Both publish clean JSON-LD and
+both list `ClaudeBot`/`GPTBot`/`anthropic-ai` in robots.txt. A literal reading lets
+`WasteWiseBot` through; that reading was not taken, and the audit is in `sites.py`.
+
+**v1 did not beat v0.** Cox c-index 0.605 against the heuristic's 0.639; the GBM scored 0.304.
+Enforced, not just reported: the scorer refuses to load a model that lost. Against real data
+the gate reads **0/150 resolved, 0/40 waste events**, and `make risk-fit` refuses to fit.
+
+### Deferred, deliberately
+
+- **APScheduler is not mounted in the FastAPI lifespan.** `conftest.py` uses
+  `with TestClient(app)`, which fires startup, so a lifespan scheduler would spin up in every
+  test. Jobs are Makefile targets (`make jobs`) and are all idempotent.
+- **The before/after euros comparison is unrun.** It needs two weeks of baseline logging
+  before it says anything, and it is sequential rather than an A/B test — confounded by
+  season, learning, and the observer effect of logging itself.

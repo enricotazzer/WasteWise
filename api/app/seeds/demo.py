@@ -28,6 +28,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.db import SessionLocal
+from app.jobs.savings import rebuild
 from app.models import (
     ConsumptionEvent,
     InventoryItem,
@@ -354,6 +355,11 @@ def main() -> int:
         counts = generate(db, user, rng)
         db.commit()
 
+        # The generator writes inventory directly, so nothing has derived its money rows.
+        # Rebuilding here keeps the ledger from lagging a `make demo` until someone happens
+        # to run the job; the entries inherit is_demo=True and stay out of every figure.
+        entries = rebuild(db, user_id=user.id, since=None)
+
         resolved = counts["consumed"] + counts["wasted"]
         rate = counts["consumed"] / resolved if resolved else 0
         print(f"generated {counts['items']} demo items over ~{WEEKS_OF_HISTORY} weeks")
@@ -367,6 +373,7 @@ def main() -> int:
         print(
             f"  {counts['prices']} with a price ({counts['prices'] / counts['items']:.0%} coverage)"
         )
+        print(f"  {entries.entries_after} savings entries derived (all is_demo)")
         print("\n  All flagged is_demo=True. Remove with `make demo-clear`.")
         print("  Excluded from Phase 3 training — synthetic outcomes are not evidence.")
     return 0

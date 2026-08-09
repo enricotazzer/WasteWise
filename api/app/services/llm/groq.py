@@ -32,6 +32,10 @@ class GroqProvider:
         # unconfigured path can't be exercised on a machine that has a key configured.
         self._api_key = settings.groq_api_key if api_key is USE_SETTINGS else api_key
         self.model = model or settings.groq_model
+        # Token counts from the last successful call, or None. Recorded rather than
+        # estimated: `recipe_suggestions` stores them, and a token count this app invented
+        # would be indistinguishable from one the provider reported.
+        self.last_usage: dict[str, int] | None = None
 
     def is_configured(self) -> bool:
         return bool(self._api_key)
@@ -83,9 +87,21 @@ class GroqProvider:
             raise LLMUnavailable(f"groq {resp.status_code}: {resp.text[:200]}")
 
         try:
-            content = resp.json()["choices"][0]["message"]["content"]
-            return json.loads(content)
+            body = resp.json()
+            content = body["choices"][0]["message"]["content"]
+            parsed = json.loads(content)
         except (KeyError, IndexError, ValueError, TypeError) as exc:
             # Strict mode should make this impossible; if it happens the model or the config
             # is not what we think it is, so surface it rather than paper over it.
             raise LLMUnavailable(f"groq returned unparseable content: {exc}") from exc
+
+        usage = body.get("usage") or {}
+        self.last_usage = (
+            {
+                "input_tokens": int(usage.get("prompt_tokens") or 0),
+                "output_tokens": int(usage.get("completion_tokens") or 0),
+            }
+            if usage
+            else None
+        )
+        return parsed

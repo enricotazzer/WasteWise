@@ -2,23 +2,19 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect, useState } from 'react'
 
 import { auth } from './api'
-import { AddItem } from './components/AddItem'
-import { Kitchen } from './components/Kitchen'
-import { Login } from './components/Login'
-import { Recipes } from './components/Recipes'
-import { ScanScreen } from './components/ScanScreen'
-import { StatsBar } from './components/StatsBar'
+import { Login } from './auth/Login'
+import { AppShell } from './shell/AppShell'
 
-type Tab = 'kitchen' | 'recipes' | 'scan' | 'add'
-
-// Scanning and the add form are single columns of controls; they read worse stretched to
-// 1240px. The board and the graph are the screens that actually want the space.
-const NARROW: Tab[] = ['scan', 'add']
-
+/**
+ * The auth gate, and nothing else.
+ *
+ * Login renders *outside* the shell deliberately: there is no navigation to offer someone
+ * who isn't signed in, and a sidebar full of links that all bounce back to a login form is
+ * worse than no chrome at all.
+ */
 export default function App() {
   const qc = useQueryClient()
   const [token, setToken] = useState<string | null>(auth.get())
-  const [tab, setTab] = useState<Tab>('kitchen')
 
   // api.ts fires this when any request comes back 401, so an expired token drops
   // straight to the login screen rather than leaving a half-broken UI.
@@ -40,44 +36,12 @@ export default function App() {
   }
 
   return (
-    <div className={`app ${NARROW.includes(tab) ? 'narrow' : ''}`}>
-      <header className="topbar">
-        <div>
-          <h1>WasteWise</h1>
-          <div className="sub">Fase 1.5 · board e grafo ricette</div>
-        </div>
-        <button
-          onClick={() => {
-            auth.clear()
-            qc.clear()
-            setToken(null)
-          }}
-        >
-          Esci
-        </button>
-      </header>
-
-      <StatsBar />
-
-      <nav className="tabs">
-        <button aria-selected={tab === 'kitchen'} onClick={() => setTab('kitchen')}>
-          In casa
-        </button>
-        <button aria-selected={tab === 'recipes'} onClick={() => setTab('recipes')}>
-          Cosa cucino
-        </button>
-        <button aria-selected={tab === 'scan'} onClick={() => setTab('scan')}>
-          Scansiona
-        </button>
-        <button aria-selected={tab === 'add'} onClick={() => setTab('add')}>
-          Aggiungi
-        </button>
-      </nav>
-
-      {tab === 'kitchen' && <Kitchen />}
-      {tab === 'recipes' && <Recipes />}
-      {tab === 'scan' && <ScanScreen />}
-      {tab === 'add' && <AddItem />}
-    </div>
+    <AppShell
+      onLogout={() => {
+        auth.clear()
+        qc.clear()
+        setToken(null)
+      }}
+    />
   )
 }

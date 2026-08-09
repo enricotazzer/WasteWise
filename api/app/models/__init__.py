@@ -3,12 +3,16 @@ from app.models.base import Base
 from app.models.catalog import Category, Product, ProductAlias
 from app.models.enums import (
     AliasSource,
+    EntryBasis,
+    EntryKind,
     EventSource,
     EventType,
     ExpirySource,
     ItemStatus,
     MatchMethod,
     RiskBand,
+    SavingsDomain,
+    SourceKind,
     Storage,
     Unit,
 )
@@ -16,6 +20,7 @@ from app.models.inventory import ConsumptionEvent, InventoryItem
 from app.models.pricing import PriceObservation
 from app.models.recipe import Recipe, RecipeSuggestion
 from app.models.risk import RiskScore
+from app.models.savings import SavingsEntry
 from app.models.user import User
 
 __all__ = [
@@ -23,6 +28,8 @@ __all__ = [
     "Base",
     "Category",
     "ConsumptionEvent",
+    "EntryBasis",
+    "EntryKind",
     "EventSource",
     "EventType",
     "ExpirySource",
@@ -37,6 +44,9 @@ __all__ = [
     "RecipeSuggestion",
     "RiskBand",
     "RiskScore",
+    "SavingsDomain",
+    "SavingsEntry",
+    "SourceKind",
     "Storage",
     "Unit",
     "User",

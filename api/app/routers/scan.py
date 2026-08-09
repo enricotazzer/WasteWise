@@ -10,6 +10,7 @@ from app.models.enums import ItemStatus, MatchMethod
 from app.schemas.inventory import InventoryItemOut
 from app.schemas.scan import BarcodeBindIn, ScanAddIn, ScanResult, ScanStats
 from app.services.barcode import bind_barcode, resolve_barcode
+from app.services.savings import sync_item
 from app.services.shelf_life import estimate_expiry
 
 router = APIRouter(prefix="/api/scan", tags=["scan"])
@@ -148,6 +149,10 @@ def add_from_scan(payload: ScanAddIn, db: DbSession, user: CurrentUser) -> Inven
                 inventory_item_id=item.id,
             )
         )
+
+    # Same transaction as the item itself — the scan path and the manual path must produce
+    # identical ledger rows, or where an item came from would change what it cost.
+    sync_item(db, item)
 
     db.commit()
     db.refresh(item)

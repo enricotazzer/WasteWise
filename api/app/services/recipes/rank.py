@@ -17,8 +17,9 @@ from dataclasses import dataclass, field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import Product, Recipe
+from app.models import Product
 from app.services.recipes.graph import GraphNode, active_products
+from app.services.recipes.retrieval import DEFAULT_POOL, candidate_recipes
 
 
 @dataclass
@@ -36,6 +37,10 @@ class RecipeMatch:
     rescues: list[str] = field(default_factory=list)
     #: Non-staple ingredients you'd have to buy. Shown, never hidden.
     missing: list[str] = field(default_factory=list)
+    #: The recipe's ingredient lines as the site published them. Grounding material for the
+    #: LLM phrasing in `generate.py`, and deliberately not part of `RecipeMatchOut` — the
+    #: suggestions endpoint returns a decision, not a copy of someone else's recipe.
+    ingredients_raw: list[str] = field(default_factory=list)
     score: float = 0.0
     #: True when nothing is missing — the UI can badge it as cookable right now.
     cookable: bool = False
@@ -63,7 +68,16 @@ def urgency_weight(node: GraphNode) -> float:
     return 0.7
 
 
-def rank_recipes(db: Session, user_id: int, *, limit: int = 12) -> list[RecipeMatch]:
+def rank_recipes(
+    db: Session, user_id: int, *, limit: int = 12, pool: int = DEFAULT_POOL
+) -> list[RecipeMatch]:
+    """Score the retrieved candidates and return the best.
+
+    Retrieval decides *what is considered*, this decides *what wins*, and the two are kept
+    apart on purpose. `candidate_recipes` returns exactly the recipes that use something in
+    the kitchen — which is the set this loop already skipped everything outside of, so the
+    answer is unchanged and only the number of rows read went down.
+    """
     nodes = active_products(db, user_id)
     if not nodes:
         return []
@@ -73,7 +87,7 @@ def rank_recipes(db: Session, user_id: int, *, limit: int = 12) -> list[RecipeMa
     products = {p.id: p for p in db.scalars(select(Product))}
 
     matches: list[RecipeMatch] = []
-    for recipe in db.scalars(select(Recipe).where(Recipe.ingredient_product_ids.isnot(None))):
+    for recipe in candidate_recipes(db, list(nodes), pool=pool):
         ids = recipe.ingredient_product_ids or []
         if not ids:
             continue
@@ -105,6 +119,9 @@ def rank_recipes(db: Session, user_id: int, *, limit: int = 12) -> list[RecipeMa
                 use_ids=used,
                 rescues=[nodes[pid].name for pid in used if nodes[pid].at_risk],
                 missing=missing_named,
+                ingredients_raw=[
+                    line for line in (recipe.ingredients_raw or []) if isinstance(line, str)
+                ],
                 score=round(score, 3),
                 cookable=not missing_named,
             )

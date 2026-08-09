@@ -1,0 +1,40 @@
+<!doctype html>
+<!-- The Yoast/WordPress shape (ricettedellanonna.net): an `@graph` wrapper with the Recipe
+     buried among unrelated nodes, `@type` as a LIST, instructions as plain strings carrying
+     HTML entities, and a second `<script>` block that is deliberately malformed — a consent
+     manager injected it, and losing the page over it would be absurd. -->
+<html lang="it">
+<head>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {"@type": "Organization", "name": "Le Ricette della Nonna"},
+    {"@type": "WebPage", "name": "Risotto ai funghi - pagina"},
+    {
+      "@type": ["Recipe", "NewsArticle"],
+      "name": "Risotto ai funghi",
+      "recipeYield": ["4", "4 servings"],
+      "totalTime": "P0DT0H45M0S",
+      "recipeIngredient": [
+        "320 g riso Carnaroli",
+        "300 g funghi porcini",
+        "1 cipolla",
+        "50 g burro",
+        "brodo vegetale q.b."
+      ],
+      "recipeInstructions": [
+        "Soffriggi la cipolla nel burro &amp; aggiungi i funghi.",
+        "Tosta il riso e sfuma con il vino.",
+        "Aggiungi il brodo poco alla volta e manteca."
+      ]
+    }
+  ]
+}
+</script>
+<script type="application/ld+json">
+{ "this": "is not valid json", }
+</script>
+</head>
+<body><h1>Risotto ai funghi</h1></body>
+</html>

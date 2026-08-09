@@ -1,5 +1,14 @@
 /** Typed API client. Mirrors the Pydantic schemas in api/app/schemas/. */
 
+// The one shape that is already declared elsewhere. `ui/moneyFigure` owns `MoneyFigure`
+// because the formatters that read it live beside it, and a euro figure is never rendered
+// without them; duplicating the interface here would let the two drift. Type-only, so
+// nothing from the UI layer ends up in the client's bundle.
+import type { MassFigure } from './ui/massFigure'
+import type { MoneyFigure } from './ui/moneyFigure'
+
+export type { MassFigure, MoneyFigure }
+
 const TOKEN_KEY = 'wastewise_token'
 
 export const auth = {
@@ -206,6 +215,192 @@ export interface Stats {
    * a completeness the data doesn't have.
    */
   price_coverage: number | null
+  /**
+   * Whether the counters above include the seeded demo ledger. Echoed by the server rather
+   * than assumed by the caller: a number computed over synthetic outcomes is not a
+   * measurement, and every screen that renders one has to be able to say so.
+   */
+  demo_included: boolean
+  /**
+   * Demo rows present in the ledger, reported whether or not they were counted. This is
+   * what lets the app decide, from the response alone, that there is nothing but demo data
+   * to show — see `lib/demoMode.ts`. `/api/inventory/stats` does not send it; the field is
+   * optional here and the dashboard's overview is the endpoint that does.
+   */
+  demo_entries?: number
+}
+
+// --- Savings ledger / reporting -----------------------------------------------------
+// Mirrors api/app/schemas/stats.py. Every euro total in here is a MoneyFigure and every
+// mass a MassFigure, because the two coverages are genuinely different numbers: only kg/g
+// items have a mass at all, so 90% price coverage and 20% mass coverage over the identical
+// rows is normal, not a bug.
+
+export type SavingsDomainId = 'food' | 'utilities' | 'subscriptions'
+
+export interface DomainTotal {
+  domain: SavingsDomainId
+  spend: MoneyFigure
+  used: MoneyFigure
+  waste: MoneyFigure
+  /** Always empty for food, by backend design — the food domain writes no counterfactuals. */
+  avoided: MoneyFigure
+  /** SPEND minus its partitions: value bought and never resolved to an outcome. */
+  unaccounted: MoneyFigure
+  waste_kg: MassFigure
+}
+
+export interface StatsOverview {
+  generated_at: string
+  demo_included: boolean
+  /** Demo rows in the ledger, reported whether or not they were included in the figures. */
+  demo_entries: number
+
+  active_items: number
+  expiring_within_3d: number
+  expired_still_active: number
+  resolved_total: number
+  consumed_total: number
+  wasted_total: number
+
+  /** The headline. Count-based over recorded outcomes, so it carries no coverage caveat. */
+  save_rate: number | null
+  /** The euro-weighted variant — a different question, over priced entries only. */
+  save_rate_eur: number | null
+  save_rate_eur_coverage: number | null
+
+  wasted: MoneyFigure
+  used: MoneyFigure
+  spend: MoneyFigure
+  wasted_kg: MassFigure
+
+  /** Empty when nothing is in scope — not a domain row full of zeros. */
+  domains: DomainTotal[]
+}
+
+export type Bucket = 'week' | 'month'
+
+export interface TimeseriesPoint {
+  bucket_start: string
+  waste_eur: string | null
+  used_eur: string | null
+  spend_eur: string | null
+  waste_kg: string | null
+  waste_entries: number
+  used_entries: number
+  spend_entries: number
+  /** Of `waste_entries`, how many carried a price. The gap is what makes `waste_eur` partial. */
+  waste_priced_entries: number
+}
+
+/** Sparse: a (bucket, category) pair only appears when something was wasted in it. */
+export interface CategoryPoint {
+  bucket_start: string
+  category_code: string
+  waste_eur: string | null
+  waste_kg: string | null
+  waste_entries: number
+}
+
+export interface TimeseriesResponse {
+  bucket: Bucket
+  start: string
+  end: string
+  domain: SavingsDomainId | null
+  demo_included: boolean
+  demo_entries: number
+  /** Contiguous and zero-filled, so a quiet week reads as zero rather than as a gap. */
+  points: TimeseriesPoint[]
+  by_category: CategoryPoint[]
+  price_coverage: number | null
+  mass_coverage: number | null
+}
+
+export interface CategoryBucket {
+  category_code: string
+  bucket_start: string
+  spend: MoneyFigure
+  waste: MoneyFigure
+  waste_share: number | null
+  /** `null` — never 0 — when there is no prior bucket. "Unknown", not "unchanged". */
+  spend_delta_pct: number | null
+  waste_delta_pct: number | null
+}
+
+/** How a risk number was produced. Travels with every response that depends on a model. */
+export interface RiskProvenance {
+  model_version: string
+  model_stage: string
+  trained_on_demo: boolean
+  /** True when someone used the `--force` escape hatch to fit below the data gate. */
+  fitted_below_gate: boolean
+  demo_included: boolean
+  demo_items: number
+  /** Ready-to-render banner copy. Rendered verbatim rather than reworded on the client. */
+  warning: string | null
+}
+
+/** Whether there is enough real history to fit v1 at all. */
+export interface RiskGate {
+  resolved: number
+  waste_events: number
+  min_resolved: number
+  min_waste_events: number
+  met: boolean
+  resolved_short: number
+  waste_short: number
+  summary: string
+}
+
+export interface RiskModelMetrics {
+  name: string
+  concordance: number | null
+  threshold: number
+  true_positives: number
+  false_positives: number
+  false_negatives: number
+  true_negatives: number
+  precision: number | null
+  recall: number | null
+  f1: number | null
+  flagged: number
+  positives: number
+  /** Items the precision/recall figures were computed over. Small — show it. */
+  evaluated: number
+  /** Items the concordance was ranked over; larger, because it uses censored rows too. */
+  ranked: number
+}
+
+export interface RiskEvaluation {
+  generated_at: string
+  trained_on_demo: boolean
+  provenance: RiskProvenance
+  gate: RiskGate
+  fitted: boolean
+  threshold: number
+  split_on: string | null
+  train_rows: number
+  test_rows: number
+  total_rows: number
+  demo_rows: number
+  models: RiskModelMetrics[]
+  best_model: string | null
+  /** null when there is no v1 to compare against. */
+  v1_beats_v0: boolean | null
+  design_columns: string[]
+  dropped_columns: string[]
+  coefficients: Record<string, number>
+  notes: string[]
+}
+
+export interface ByCategoryResponse {
+  bucket: Bucket
+  start: string
+  end: string
+  domain: SavingsDomainId | null
+  demo_included: boolean
+  demo_entries: number
+  rows: CategoryBucket[]
 }
 
 export interface WasteReason {
@@ -313,5 +508,31 @@ export const api = {
   deleteItem: (itemId: number) =>
     request<void>(`/api/inventory/items/${itemId}`, { method: 'DELETE' }),
 
-  stats: () => request<Stats>('/api/inventory/stats'),
+  stats: (includeDemo = false) =>
+    request<Stats>(`/api/inventory/stats?include_demo=${includeDemo}`),
+
+  // --- savings ledger ---
+  // Every one of these takes `include_demo`. It is a required argument rather than a
+  // defaulted one: `false` is the server's default and it silently returns an empty
+  // ledger, which is how the KPI row came to read "0 in casa" above a board of 69 items.
+  // Making the caller state its intent means that mismatch cannot happen twice.
+
+  statsOverview: (includeDemo: boolean) =>
+    request<StatsOverview>(`/api/stats/overview?include_demo=${includeDemo}`),
+
+  statsTimeseries: (params: { bucket: Bucket; periods: number; includeDemo: boolean }) =>
+    request<TimeseriesResponse>(
+      // `weeks` counts buckets, not weeks — the backend kept the parameter name after the
+      // month bucket was added.
+      `/api/stats/timeseries?bucket=${params.bucket}&weeks=${params.periods}&include_demo=${params.includeDemo}`,
+    ),
+
+  statsByCategory: (params: { bucket: Bucket; periods: number; includeDemo: boolean }) =>
+    request<ByCategoryResponse>(
+      `/api/stats/by-category?bucket=${params.bucket}&months=${params.periods}&include_demo=${params.includeDemo}`,
+    ),
+
+  // --- risk ---
+  riskEvaluation: (includeDemo: boolean) =>
+    request<RiskEvaluation>(`/api/risk/evaluation?include_demo=${includeDemo}`),
 }

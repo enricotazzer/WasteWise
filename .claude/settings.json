@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -)",
+      "Bash(sed -i '' 's/^\\\\.PHONY: \\\\\\(.*\\\\\\)$/.PHONY: \\\\1 eval eval-demo/' Makefile)",
+      "Bash(make eval *)",
+      "Bash(python3 -c ' *)",
+      "Bash(sed -i '' '254s/.*/| --- | ---: | ---: |/' README.md)",
+      "Bash(sed -i '' '281s/.*/| --- | ---: | ---: | ---: | ---: |/' README.md)",
+      "Bash(sed -i '' '221s/^```$/```text/' README.md)",
+      "Bash(sed -i '' '103s/^|---|---|---|$/| --- | --- | --- |/' README.md)",
+      "Bash(sed -i '' '126s/^|---|---|---|$/| --- | --- | --- |/' README.md)",
+      "Bash(curl -s localhost:8000/openapi.json)",
+      "Bash(lsof -ti:5173,5174)"
+    ]
+  }
+}

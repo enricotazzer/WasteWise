@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.deps import CurrentUser, DbSession
 from app.models import ConsumptionEvent, InventoryItem, PriceObservation, Product
 from app.models.enums import EventSource, EventType, ExpirySource, ItemStatus
+from app.models.inventory import RESOLVE_EPSILON
 from app.schemas.inventory import (
     ConsumptionEventCreate,
     ConsumptionEventOut,
@@ -17,12 +18,10 @@ from app.schemas.inventory import (
     OpenItemIn,
     RecentProduct,
 )
+from app.services.savings import aggregate, sync_item
 from app.services.shelf_life import estimate_expiry
 
 router = APIRouter(prefix="/api/inventory", tags=["inventory"])
-
-# Below this, an item is treated as used up rather than leaving a 0.02 sliver forever.
-_EPSILON = 0.01
 
 
 _to_out = InventoryItemOut.from_item
@@ -86,6 +85,10 @@ def create_item(payload: InventoryItemCreate, db: DbSession, user: CurrentUser) 
                 inventory_item_id=item.id,
             )
         )
+
+    # In the same transaction, not after it: a failed ledger write has to roll the item back
+    # rather than leave the two out of step.
+    sync_item(db, item)
 
     db.commit()
     db.refresh(item)
@@ -203,7 +206,7 @@ def log_event(
         item.resolved_at = occurred
     else:  # PARTIAL
         item.fraction_remaining = max(0.0, item.fraction_remaining - payload.fraction_used)
-        if item.fraction_remaining <= _EPSILON:
+        if item.fraction_remaining <= RESOLVE_EPSILON:
             item.fraction_remaining = 0.0
             item.status = ItemStatus.CONSUMED
             item.resolved_at = occurred
@@ -211,6 +214,10 @@ def log_event(
             item.status = ItemStatus.PARTIAL
             if item.opened_at is None:
                 item.opened_at = occurred.date()
+
+    # Synchronous and in-transaction: tapping "buttato" has to move the euro figure now, and
+    # a ledger that disagreed with the events it was derived from would be worse than none.
+    sync_item(db, item)
 
     db.commit()
     db.refresh(event)
@@ -254,60 +261,39 @@ def delete_item(item_id: int, db: DbSession, user: CurrentUser) -> None:
     db.commit()
 
 
-@router.get("/stats", response_model=InventoryStats)
-def stats(db: DbSession, user: CurrentUser) -> InventoryStats:
-    """Phase 0 counters. Non-food categories are excluded from the money figures —
-    wasting dish soap is not food waste."""
-    today = date.today()
+@router.get("/stats", response_model=InventoryStats, deprecated=True)
+def stats(
+    db: DbSession,
+    user: CurrentUser,
+    include_demo: bool = Query(default=False),
+) -> InventoryStats:
+    """Deprecated — use `/api/stats/overview`, which carries the coverage of each figure.
 
-    items = list(
-        db.scalars(
-            select(InventoryItem)
-            .options(joinedload(InventoryItem.product).joinedload(Product.category))
-            .where(InventoryItem.user_id == user.id)
-        )
-    )
+    Now a thin delegate over the savings ledger. It used to compute its euros by walking two
+    independently-built Python lists, which had two defects the ledger fixes:
 
-    active = [i for i in items if i.status in (ItemStatus.ACTIVE, ItemStatus.PARTIAL)]
-    expiring = [
-        i for i in active if i.expiry_date is not None and 0 <= (i.expiry_date - today).days <= 3
-    ]
-    expired = [i for i in active if i.expiry_date is not None and i.expiry_date < today]
+      * it never filtered `is_demo`, so on any machine that had run `make demo` these
+        numbers were computed over ~8 weeks of *synthetic* outcomes and rendered with no
+        indication of it. `include_demo` now defaults to False and the response says so.
+      * it charged the whole item value to `eur_wasted` even when the item had been
+        partially used first, overstating waste. The fraction walk charges the remainder.
 
-    consumed = [i for i in items if i.status == ItemStatus.CONSUMED]
-    wasted = [i for i in items if i.status == ItemStatus.WASTED]
-
-    def value(item: InventoryItem) -> Decimal:
-        if item.unit_price_eur is None or not item.product.category.is_food:
-            return Decimal("0")
-        return (item.unit_price_eur * item.quantity).quantize(Decimal("0.01"))
-
-    # Quantize the totals, not just the parts: an empty sum would otherwise serialize as
-    # "0" while a non-empty one gives "0.00", which makes the field awkward to format.
-    cents = Decimal("0.01")
-    eur_wasted = sum((value(i) for i in wasted), Decimal("0")).quantize(cents)
-    eur_consumed = sum((value(i) for i in consumed), Decimal("0")).quantize(cents)
-
-    food_consumed = len([i for i in consumed if i.product.category.is_food])
-    food_wasted = len([i for i in wasted if i.product.category.is_food])
-    denom = food_consumed + food_wasted
-    save_rate = (food_consumed / denom) if denom else None
-
-    # What fraction of the resolved food actually carried a price. Without this the euro
-    # totals read as complete when they're computed over a partial sample.
-    resolved_food = [i for i in consumed + wasted if i.product.category.is_food]
-    priced = len([i for i in resolved_food if i.unit_price_eur is not None])
-    price_coverage = (priced / len(resolved_food)) if resolved_food else None
-
+    Kept alive because the frontend still calls it. `eur_wasted`/`eur_consumed` collapse the
+    ledger's "no price was typed" to 0.00 here, which is precisely the flattening this
+    schema cannot express and the reason it is deprecated.
+    """
+    stats = aggregate.overview(db, user_id=user.id, include_demo=include_demo)
+    zero = Decimal("0.00")
     return InventoryStats(
-        active_items=len(active),
-        expiring_within_3d=len(expiring),
-        expired_still_active=len(expired),
-        resolved_total=len(consumed) + len(wasted),
-        consumed_total=len(consumed),
-        wasted_total=len(wasted),
-        eur_wasted=eur_wasted,
-        eur_consumed=eur_consumed,
-        save_rate=save_rate,
-        price_coverage=price_coverage,
+        active_items=stats.active_items,
+        expiring_within_3d=stats.expiring_within_3d,
+        expired_still_active=stats.expired_still_active,
+        resolved_total=stats.resolved_total,
+        consumed_total=stats.consumed_total,
+        wasted_total=stats.wasted_total,
+        eur_wasted=stats.wasted.eur or zero,
+        eur_consumed=stats.used.eur or zero,
+        save_rate=stats.save_rate,
+        price_coverage=stats.save_rate_eur_coverage,
+        demo_included=stats.demo_included,
     )
