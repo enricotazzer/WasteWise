@@ -353,7 +353,7 @@ Then on the **phone**, over `https://<lan-ip>:5173`: scan a real product, confir
 | Path | Purpose |
 |---|---|
 | `api/app/models/barcode.py` | `ProductBarcode` — the cache *and* the learning table |
-| `api/app/services/barcode/off_client.py` | `httpx` client: `User-Agent: WasteWise/0.1 (enrico.tappo00@gmail.com)`, token-bucket throttle, 5s timeout, retry-once, returns `None` on `status: 0` (unknown barcode) rather than raising |
+| `api/app/services/barcode/off_client.py` | `httpx` client: `User-Agent: WasteWise/0.1 (<OFF_CONTACT_EMAIL>)`, token-bucket throttle, 5s timeout, retry-once, returns `None` on `status: 0` (unknown barcode) rather than raising |
 | `api/app/services/barcode/category_map.py` | `OFF_TAG_TO_CATEGORY` rules table → one of the 31 seeded codes; LLM only for the tail |
 | `api/app/services/barcode/resolver.py` | The 4-tier orchestration; the only module routers call |
 | `api/app/services/llm/base.py` | `LLMProvider` protocol: `complete_json(system, user, schema) -> dict` |

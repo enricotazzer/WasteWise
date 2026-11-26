@@ -22,13 +22,17 @@ dist/
 # TLS certs for LAN dev — machine-specific, and the key must never be committed
 web/.certs/
 
-# Data — a scraped recipe corpus is large and rebuildable, not source
-data/recipes/
+# Runtime state — never source: the crawl frontier (resumable, rebuildable) and fitted
+# model pickles, which /api/risk/* unpickles on every request. A committed pickle is code
+# execution on the next pull.
+data/
 
 # Notebooks
 .ipynb_checkpoints/
 
 # OS / editor
 .DS_Store
+# AppleDouble sidecars macOS writes on non-APFS volumes (this repo lives on exFAT)
+._*
 *.swp
 .idea/
