@@ -47,7 +47,7 @@ narwhals==2.24.0
 numpy==2.5.1
 onnxruntime==1.28.0
 packaging==26.3
-pandas==2.3.3
+pandas==3.1.1
 passlib==1.7.4
 pgvector==0.5.0
 pillow==12.3.0

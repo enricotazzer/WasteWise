@@ -37,7 +37,7 @@ dependencies = [
     # and the eval notebook use them directly rather than only through those two.
     "lifelines>=0.30",
     "scikit-learn>=1.6",
-    "pandas>=2.2",
+    "pandas>=3.1.1",
     "numpy>=2.1",
     # --- Recipes (phase 4) ---
     # ONNX rather than sentence-transformers, which is what the brief names. Same model
