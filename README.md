@@ -1,5 +1,7 @@
 # WasteWise
 
+[![CI](https://github.com/enricotazzer/WasteWise/actions/workflows/ci.yml/badge.svg)](https://github.com/enricotazzer/WasteWise/actions/workflows/ci.yml)
+
 Reduce household food waste and optimize grocery spending using real personal purchase and
 consumption data.
 
@@ -74,6 +76,7 @@ make embed           # embed the corpus for pgvector reranking — CPU, offline
 make jobs            # the nightly chain: repurchase -> savings-rebuild -> risk-score
 make risk-fit        # fit v1; refuses below the data gate and says how far short
 make scan-stats      # how many barcodes resolved without typing
+make lock            # pin the tested package versions into api/requirements*.txt
 make reset           # DESTRUCTIVE: drop the volume and rebuild
 ```
 

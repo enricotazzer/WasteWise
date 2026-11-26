@@ -1,0 +1,12 @@
+# Generated 2026-11-26 by `make lock` (scripts/freeze_requirements.py).
+# Dependabot may bump single pins in between; regenerate from a tested image.
+# Dev-only pins on top of the runtime set.
+-r requirements.txt
+coverage==7.15.4
+iniconfig==2.3.0
+pluggy==1.6.0
+Pygments==2.20.0
+pytest==9.1.1
+pytest-cov==7.1.0
+respx==0.23.1
+ruff==0.16.1

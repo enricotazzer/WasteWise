@@ -1,4 +1,4 @@
-.PHONY: help setup up down logs migrate revision seed seed-recipes demo demo-clear reset test lint web-install web dev-https certs scan-stats savings-rebuild repurchase risk-score risk-fit crawl embed jobs eval eval-demo
+.PHONY: help setup up down logs migrate revision seed seed-recipes demo demo-clear reset test lint web-install web dev-https certs lock scan-stats savings-rebuild repurchase risk-score risk-fit crawl embed jobs eval eval-demo
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-16s\033[0m %s\n",$$1,$$2}'
@@ -48,8 +48,11 @@ test:   ## Run the test suite inside the api container
 	docker compose exec -T api pytest -q
 
 lint:   ## Ruff check + format
-	docker compose exec -T api ruff check app tests
-	docker compose exec -T api ruff format --check app tests
+	docker compose exec -T api ruff check app tests scripts
+	docker compose exec -T api ruff format --check app tests scripts
+
+lock:   ## Pin the api image's tested versions into api/requirements*.txt
+	docker compose exec -T api python scripts/freeze_requirements.py
 
 web-install:  ## Install frontend deps
 	cd web && npm install

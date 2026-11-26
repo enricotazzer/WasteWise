@@ -23,7 +23,9 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "bcrypt==4.0.1",
     "python-multipart>=0.0.17",
-    "apscheduler>=3.10",
+    # <4: the 4.x API is a rewrite (no BlockingScheduler), and the Phase 4 scheduler is
+    # written against 3.x.
+    "apscheduler>=3.10,<4",
     "pgvector>=0.3.6",
     # Runtime, not just test: Open Food Facts and both LLM providers are plain HTTP calls,
     # which is cheaper than three vendor SDKs for the surface actually used.
@@ -64,7 +66,9 @@ target-version = "py312"
 # The seed files are data tables, reviewed by a human as tables. The formatter explodes
 # them one-field-per-line (recipes.py went from 277 to 900+ lines), which destroys the only
 # property that makes them reviewable. Excluded from the formatter; E501 waived below.
-extend-exclude = ["app/seeds/data.py", "app/seeds/recipes.py"]
+# `**/._*`: macOS writes AppleDouble sidecars (binary, named like the source file) on the
+# exFAT volume this repo lives on, and ruff would otherwise try to parse them as Python.
+extend-exclude = ["app/seeds/data.py", "app/seeds/recipes.py", "**/._*"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
