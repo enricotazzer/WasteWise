@@ -12,21 +12,21 @@ name = "wastewise-api"
 version = "0.1.0"
 requires-python = ">=3.12"
 dependencies = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.32",
-    "sqlalchemy>=2.0.36",
-    "psycopg[binary]>=3.2",
-    "alembic>=1.14",
-    "pydantic[email]>=2.10",  # [email] -> email-validator, required by EmailStr
-    "pydantic-settings>=2.6",
+    "fastapi>=0.165.0",
+    "uvicorn[standard]>=0.54.0",
+    "sqlalchemy>=2.1.9",
+    "psycopg[binary]>=3.3.9",
+    "alembic>=1.20.1",
+    "pydantic[email]>=2.14.4",  # [email] -> email-validator, required by EmailStr
+    "pydantic-settings>=2.16.3",
     "python-jose[cryptography]>=3.3",
-    "passlib[bcrypt]>=1.7.4",
+    "passlib[bcrypt]>=1.9.5",
     "bcrypt==4.0.1",
-    "python-multipart>=0.0.17",
+    "python-multipart>=0.0.34",
     # <4: the 4.x API is a rewrite (no BlockingScheduler), and the Phase 4 scheduler is
     # written against 3.x.
     "apscheduler>=3.10,<4",
-    "pgvector>=0.3.6",
+    "pgvector>=0.5.1",
     # Runtime, not just test: Open Food Facts and both LLM providers are plain HTTP calls,
     # which is cheaper than three vendor SDKs for the surface actually used.
     "httpx>=0.28",
@@ -36,9 +36,9 @@ dependencies = [
     # against. Both depend on pandas/numpy, which are pinned here because the feature frame
     # and the eval notebook use them directly rather than only through those two.
     "lifelines>=0.30",
-    "scikit-learn>=1.6",
+    "scikit-learn>=1.9.1",
     "pandas>=2.2",
-    "numpy>=2.1",
+    "numpy>=2.5.5",
     # --- Recipes (phase 4) ---
     # ONNX rather than sentence-transformers, which is what the brief names. Same model
     # (all-MiniLM-L6-v2) and the same 384-dim output the `recipes.embedding` column is
@@ -46,7 +46,7 @@ dependencies = [
     # sentence-transformers would pull torch (~2 GB in this image) to do identical work.
     # The brief's intent was "CPU embeddings, offline, no API cost"; this satisfies it and
     # keeps `make setup` from becoming a multi-gigabyte download.
-    "fastembed>=0.5",
+    "fastembed>=0.9.1",
     # JSON-LD extraction: recipe sites embed schema.org/Recipe in <script> tags, so the
     # parser needs to find those tags, not to understand the surrounding HTML.
     "selectolax>=0.3.21",
@@ -54,10 +54,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=8.3",
+    "pytest>=9.2.0",
     "pytest-cov>=6.0",
     "respx>=0.22",  # httpx mocking — no network in the test suite
-    "ruff>=0.8",
+    "ruff>=0.17.6",
 ]
 
 [tool.ruff]
