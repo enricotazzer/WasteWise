@@ -300,25 +300,16 @@ def build(db: Session, *, include_demo: bool = False, user_id: int | None = None
         select(func.count(InventoryItem.id)).where(InventoryItem.is_demo.is_(False))
     )
     if not include_demo and not real_items:
-        # Two different empty states, and the difference is the whole point of this banner:
-        # it has to name the *actual* reason a figure is missing. Saying "the only rows are
-        # synthetic" when the table is empty is both false and useless advice — it sends the
-        # reader to --include-demo, which would print exactly as much nothing.
-        demo_items = db.scalar(
-            select(func.count(InventoryItem.id)).where(InventoryItem.is_demo.is_(True))
-        )
-        note = (
-            "Every figure below is empty because the only rows in this database are "
-            f"synthetic ({demo_items} demo items). Re-run with --include-demo to exercise "
-            "the report; the numbers it prints then describe a generator, not a household."
-            if demo_items
-            else "Nothing has been logged at all — no real rows and no demo rows. Add the "
-            "shopping and log what gets eaten or thrown away, and these figures start "
-            "filling in on their own. `make demo` puts the synthetic household back if "
-            "you want to see the shape of the report before then."
-        )
         report.sections.insert(
-            0, Section(title="Nothing has been logged for real yet", notes=[note])
+            0,
+            Section(
+                title="Nothing has been logged for real yet",
+                notes=[
+                    "Every figure below is empty because the only rows in this database are "
+                    "synthetic. Re-run with --include-demo to exercise the report; the "
+                    "numbers it prints then describe a generator, not a household."
+                ],
+            ),
         )
     return report
 
