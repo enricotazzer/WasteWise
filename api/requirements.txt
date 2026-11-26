@@ -50,7 +50,7 @@ packaging==26.3
 pandas==2.3.3
 passlib==1.7.4
 pgvector==0.5.0
-pillow==12.3.0
+pillow==13.0.0
 protobuf==7.35.1
 psycopg==3.3.4
 psycopg-binary==3.3.4
